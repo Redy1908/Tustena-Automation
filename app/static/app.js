@@ -10,6 +10,10 @@ function isCsvMode() {
   return document.querySelector('.mode-chip.active')?.dataset.mode === 'csv';
 }
 
+function isIcalMode() {
+  return document.querySelector('.mode-chip.active')?.dataset.mode === 'ical';
+}
+
 
 function _setTab(tab) {
   activeTab = tab;
@@ -26,15 +30,18 @@ document.querySelectorAll('.mode-chip').forEach(chip => {
   chip.addEventListener('click', () => {
     document.querySelectorAll('.mode-chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
-    const isFloat = chip.dataset.mode === 'float';
+    const mode = chip.dataset.mode;
+    const isFloat = mode === 'float';
+    const isIcal  = mode === 'ical';
     document.getElementById('mode-float').style.display = isFloat ? '' : 'none';
-    document.getElementById('mode-csv').style.display   = isFloat ? 'none' : '';
-    // swap visible tabs
+    document.getElementById('mode-ical').style.display  = isIcal  ? '' : 'none';
+    document.getElementById('mode-csv').style.display   = (isFloat || isIcal) ? 'none' : '';
+    // swap visible tabs: float hides "Tutti", shows "Intervallo"; csv/ical show "Tutti", hide "Intervallo"
     document.querySelector('.tab[data-tab="all"]').style.display   = isFloat ? 'none' : '';
-    document.querySelector('.tab[data-tab="range"]').style.display = isFloat ? '' : 'none';
+    document.querySelector('.tab[data-tab="range"]').style.display = isFloat || isIcal ? '' : 'none';
     // reset to sensible default for the mode
-    if (isFloat && activeTab === 'all')   _setTab('single');
-    if (!isFloat && activeTab === 'range') _setTab('all');
+    if (isFloat && activeTab === 'all')          _setTab('single');
+    if (!isFloat && !isIcal && activeTab === 'range') _setTab('all');
   });
 });
 
@@ -143,6 +150,7 @@ document.querySelectorAll('.tab').forEach(btn => {
 [
   ['tustena_api_key',       'input',  'err-tustena-api-key'],
   ['float_api_key', 'input',  'err-float-api-key'],
+  ['ical_url',      'input',  'err-ical-url'],
   ['date',          'change', 'err-date'],
   ['date_from',     'change', 'err-date-range'],
   ['date_to',       'change', 'err-date-range'],
@@ -162,6 +170,10 @@ function validate() {
   if (isCsvMode()) {
     if (!csvFile) { showError('csv_drop_zone', 'err-csv-file'); ok = false; }
     else clearError('csv_drop_zone', 'err-csv-file');
+  } else if (isIcalMode()) {
+    const icalEl = document.getElementById('ical_url');
+    if (!icalEl.value.trim()) { showError('ical_url', 'err-ical-url'); ok = false; }
+    else clearError('ical_url', 'err-ical-url');
   } else {
     const floatEl = document.getElementById('float_api_key');
     if (floatEl) {
@@ -207,6 +219,7 @@ document.getElementById('form').addEventListener('submit', async e => {
   if (!validate()) return;
 
   lastTustenaApiKey = document.getElementById('tustena_api_key').value.trim();
+  lastFloatICalUrl = document.getElementById('ical_url').value.trim();
 
   const btn = document.getElementById('preview-btn');
   btn.disabled = true;
@@ -227,6 +240,16 @@ document.getElementById('form').addEventListener('submit', async e => {
     }
     fetchUrl  = '/preview_csv';
     fetchInit = { method: 'POST', body: fd };
+  } else if (isIcalMode()) {
+    const body = { tustena_api_key: lastTustenaApiKey, ical_url: lastFloatICalUrl};
+    if (activeTab === 'single') {
+      body.date = document.getElementById('date').value;
+    } else if (activeTab === 'range') {
+      body.date_from = document.getElementById('date_from').value;
+      body.date_to   = document.getElementById('date_to').value;
+    }
+    fetchUrl  = '/preview_ical';
+    fetchInit = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
   } else {
     const body = { tustena_api_key: lastTustenaApiKey };
     const floatEl = document.getElementById('float_api_key');

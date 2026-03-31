@@ -5,6 +5,7 @@ import tempfile
 import requests
 from flask import Flask, jsonify, render_template, request, send_file
 from csv_parsing import parse_float_people_csv
+from ical_parsing import parse_ical_feed
 from float_api import float_get_allocations, float_get_person_id, float_mark_task_completed
 from tustena_api import (
     tustena_get_company_id, tustena_get_contract_id, tustena_get_service_id,
@@ -116,6 +117,7 @@ def index():
         "index.html",
         tustena_api_key=os.environ.get("TUSTENA_API_KEY", ""),
         float_api_key=os.environ.get("FLOAT_API_KEY", ""),
+        float_ical_url=os.environ.get("FLOAT_ICAL_URL", ""),
     )
 
 
@@ -222,6 +224,39 @@ def preview_csv():
         return jsonify({"allocations": enriched})
     except Exception as e:
         logger.exception("Unhandled error in /preview_csv")
+        msg, status = _friendly_error(e)
+        return jsonify({"error": msg}), status
+
+
+@app.route("/preview_ical", methods=["POST"])
+def preview_ical():
+    try:
+        data            = request.get_json(force=True)
+        tustena_api_key = data.get("tustena_api_key", "").strip()
+        ical_url        = data.get("ical_url", "").strip() or os.environ.get("FLOAT_ICAL_URL", "").strip()
+        if not tustena_api_key:
+            return jsonify({"error": "API key Tustena mancante."}), 400
+        if not ical_url:
+            return jsonify({"error": "URL iCal mancante."}), 400
+
+        resp = requests.get(ical_url, timeout=30)
+        resp.raise_for_status()
+
+        tasks = parse_ical_feed(resp.text)
+        tasks = _filter_tasks_by_date(
+            tasks,
+            data.get("date", "").strip(),
+            data.get("date_from", "").strip(),
+            data.get("date_to", "").strip(),
+        )
+        if not tasks:
+            return jsonify({"error": "Nessuna allocazione trovata nel feed iCal per il periodo selezionato."}), 400
+
+        tustena_user_id, _ = _get_tustena_context(tustena_api_key)
+        enriched = _enrich_and_check(tasks, tustena_api_key, tustena_user_id)
+        return jsonify({"allocations": enriched})
+    except Exception as e:
+        logger.exception("Unhandled error in /preview_ical")
         msg, status = _friendly_error(e)
         return jsonify({"error": msg}), status
 

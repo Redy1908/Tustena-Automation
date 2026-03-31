@@ -27,6 +27,7 @@
     <div class="mode-selector">
       <button type="button" class="mode-chip active" data-mode="csv">Tustena</button>
       <button type="button" class="mode-chip" data-mode="float">Tustena+Float</button>
+      <button type="button" class="mode-chip" data-mode="ical">Tustena+iCal</button>
     </div>
 
     <div class="field">
@@ -46,6 +47,14 @@
         <label>Float API Key</label>
         <input type="password" id="float_api_key" name="float_api_key" placeholder="float-api-key" value="{{ float_api_key }}" />
         <span class="field-error-msg" id="err-float-api-key">Inserisci la Float API key.</span>
+      </div>
+    </div>
+
+    <div id="mode-ical" style="display:none">
+      <div class="field">
+        <label>Float iCal URL</label>
+        <input type="url" id="ical_url" name="ical_url" placeholder="https://…/ical/…" value="{{ float_ical_url }}" />
+        <span class="field-error-msg" id="err-ical-url">Inserisci l'URL iCal di Float.</span>
       </div>
     </div>
 
@@ -201,6 +210,10 @@
     <div class="help-section">
       <h3>Tustena+Float</h3>
       <p>Le allocazioni vengono recuperate direttamente da Float tramite API. Al termine, vengono automaticamente marcate come <em>completate</em> su Float. La variabile d'ambiente <code>FLOAT_API_KEY</code> precompila il rispettivo campo.</p>
+    </div>
+    <div class="help-section">
+      <h3>Tustena+iCal</h3>
+      <p>Le allocazioni vengono recuperate dal feed iCal di Float configurato tramite la variabile d'ambiente <code>FLOAT_ICAL_URL</code> sul server. Non richiede una Float API key. Le allocazioni non vengono marcate come completate su Float.</p>
     </div>
     <div class="help-section">
       <h3>Nota</h3>
