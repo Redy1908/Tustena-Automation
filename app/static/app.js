@@ -423,16 +423,15 @@ function updateExecuteState() {
   const btn     = document.getElementById('execute-btn');
   const warning = document.getElementById('execute-warning');
 
+  const hasErrors  = document.querySelectorAll('.voucher-row.voucher-error').length > 0;
+
   const descEls = [...document.querySelectorAll('.voucher-row:not(.voucher-exists):not(.voucher-error) .voucher-description')];
   descEls.forEach(el => el.classList.toggle('input-error', !el.value.trim()));
   const missingDesc = descEls.some(el => !el.value.trim());
 
-  btn.disabled = errors.length > 0 || missingDesc || previewData.length === 0;
-  if (errors.length > 0) {
-    warning.querySelector('.execute-warning-tip').textContent = 'Controlla gli orari dei voucher prima di procedere.';
-    warning.style.display = 'inline-flex';
-  } else if (missingDesc) {
-    warning.querySelector('.execute-warning-tip').textContent = 'Compila il rapportino per tutti i voucher.';
+  btn.disabled = errors.length > 0 || hasErrors || missingDesc || previewData.length === 0;
+  if (errors.length > 0 || hasErrors || missingDesc) {
+    warning.querySelector('.execute-warning-tip').textContent = 'Controlla i voucher prima di procedere.';
     warning.style.display = 'inline-flex';
   } else {
     warning.style.display = 'none';

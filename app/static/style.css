@@ -706,8 +706,10 @@ textarea.input-error {
 .voucher-error-msg {
   font-size: 0.78rem;
   color: var(--error);
-  flex-shrink: 0;
-  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .voucher-exists { opacity: 0.5; }
