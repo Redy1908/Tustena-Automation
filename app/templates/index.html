@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Float → Tustena</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+</head>
+<body>
+
+
+<button class="theme-toggle" id="help-btn" aria-label="Aiuto" style="right: 3.75rem; position: fixed; top: 1rem;">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+</button>
+
+<button class="theme-toggle" id="theme-toggle" aria-label="Cambia tema">
+  <svg id="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  <svg id="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+</button>
+
+<h1>Float <span>→</span> Tustena</h1>
+
+<div class="card" id="step1">
+  <form id="form">
+
+    <div class="mode-selector">
+      <button type="button" class="mode-chip active" data-mode="csv">Tustena</button>
+      <button type="button" class="mode-chip" data-mode="float">Tustena+Float</button>
+    </div>
+
+    <div class="field">
+      <label>
+        Tustena API Key
+        <span class="info-icon" tabindex="0" aria-label="Come recuperare l'API key">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span class="tooltip">Tustena CRM → Setup → Gestione Account → Web API Keys → Nuova</span>
+        </span>
+      </label>
+      <input type="password" id="tustena_api_key" name="tustena_api_key" placeholder="tustena-api-key" value="{{ tustena_api_key }}" />
+      <span class="field-error-msg" id="err-tustena-api-key">Inserisci l'API key Tustena.</span>
+    </div>
+
+    <div id="mode-float" style="display:none">
+      <div class="field">
+        <label>Float API Key</label>
+        <input type="password" id="float_api_key" name="float_api_key" placeholder="float-api-key" value="{{ float_api_key }}" />
+        <span class="field-error-msg" id="err-float-api-key">Inserisci la Float API key.</span>
+      </div>
+    </div>
+
+    <div id="mode-csv">
+      <div class="field">
+        <label>
+          File CSV Float
+          <span class="info-icon" tabindex="0" aria-label="Come esportare da Float">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span class="tooltip">Float → Filtra "Me" → Share → Export .csv → Day</span>
+          </span>
+        </label>
+        <div class="drop-zone" id="csv_drop_zone">
+          <input type="file" id="csv_file" accept=".csv" hidden />
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="drop-zone-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="drop-zone-text">Trascina il CSV qui o <u>clicca per sceglierlo</u></span>
+          <span class="drop-zone-filename" id="csv_filename"></span>
+        </div>
+        <span class="field-error-msg" id="err-csv-file">Seleziona un file CSV.</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Periodo</label>
+      <div class="date-tabs">
+        <button type="button" class="tab active" data-tab="all">Tutti</button>
+        <button type="button" class="tab" data-tab="single">Giorno</button>
+        <button type="button" class="tab" data-tab="range" style="display:none">Intervallo</button>
+      </div>
+      <div id="tab-all" class="date-panel"></div>
+      <div id="tab-single" class="date-panel" style="display:none">
+        <div class="date-input-wrap">
+          <input type="date" id="date" name="date" />
+        </div>
+        <span class="field-error-msg" id="err-date">Seleziona un giorno.</span>
+      </div>
+      <div id="tab-range" class="date-panel" style="display:none">
+        <div class="date-range-row">
+          <div class="date-input-wrap">
+            <input type="date" id="date_from" name="date_from" />
+          </div>
+          <span class="range-sep">→</span>
+          <div class="date-input-wrap">
+            <input type="date" id="date_to" name="date_to" />
+          </div>
+        </div>
+        <span class="field-error-msg" id="err-date-range">Seleziona entrambe le date dell'intervallo.</span>
+      </div>
+    </div>
+
+    <button class="btn" type="submit" id="preview-btn">Anteprima →</button>
+    <div class="form-error" id="form-error"></div>
+  </form>
+</div>
+
+<div class="contact-box">
+  <span>Problemi o suggerimenti?</span>
+  <a href="https://github.com/Redy1908/Tustena-Automation" target="_blank" rel="noopener">GitHub</a>
+</div>
+
+<div class="warning-banner" id="warning-banner-full">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  <div class="warning-body">
+    <div class="warning-summary" id="warning-toggle">
+      <span>Alcune allocazioni possono fallire.</span>
+      <span class="warning-expand-hint">Come risolvere <svg class="warning-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+    </div>
+    <div class="warning-details" id="warning-details" style="display:none">
+      <span>Alcune allocazioni possono fallire per un mismatch tra il nome dell'azienda su Float e il corrispondente su Tustena. Per risolvere, cerca il nome esatto su Tustena tramite il campo qui sotto e aggiungilo nel file <code>mappings/company_mapping.json</code> nella forma <code>"nome Float": "nome Tustena"</code>.</span>
+      <div class="company-search">
+        <div class="company-search-row">
+          <input type="text" id="company-search-input" placeholder="Cerca azienda su Tustena…" />
+          <button type="button" id="company-search-btn">Cerca</button>
+        </div>
+        <ul id="company-search-results" class="search-results"></ul>
+      </div>
+      <span>Lo stesso vale per i servizi: se la descrizione del servizio su Float non corrisponde al <code>catalogDescription</code> su Tustena, cerca i servizi disponibili per un contratto e aggiorna <code>mappings/service_mapping.json</code> nella forma <code>"nome Float": "nome Tustena"</code>.</span>
+      <div class="company-search">
+        <div class="company-search-row">
+          <input type="text" id="service-company-input" placeholder="Azienda (nome Tustena)…" />
+          <input type="text" id="service-contract-input" placeholder="Codice contratto…" />
+          <button type="button" id="service-search-btn">Cerca</button>
+        </div>
+        <ul id="service-search-results" class="search-results"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="warning-banner warning-banner--compact" id="warning-banner-compact" style="display:none">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  <span>Alcuni voucher hanno un mismatch tra Float e Tustena. Usa la ricerca nel banner iniziale per trovare i nomi corretti e aggiornare i file di mapping.</span>
+  <button type="button" class="warning-back-btn" id="warning-back-btn">← Torna al form</button>
+</div>
+
+<div class="card" id="step2">
+  <div class="step2-header">
+    <div class="step2-counts">
+      <span id="step2-count" class="step2-count"></span>
+      <span id="step2-exists" class="step2-exists" style="display:none"></span>
+      <span id="step2-errors" class="step2-errors" style="display:none"></span>
+    </div>
+    <div class="step2-actions">
+      <button type="button" class="btn-toggle-exists" id="toggle-exists-btn" style="display:none">Nascondi già presenti</button>
+      <button type="button" class="btn-back" id="back-btn">← Modifica</button>
+    </div>
+  </div>
+  <div id="voucher-list"></div>
+  <div class="step2-footer">
+    <div class="execute-wrap">
+      <button class="btn" id="execute-btn">Crea Voucher</button>
+      <span class="execute-warning" id="execute-warning">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span class="execute-warning-tip"></span>
+      </span>
+    </div>
+  </div>
+</div>
+
+<div class="output-card" id="output-card">
+  <div class="output-header">
+    <span><span class="status-dot" id="status-dot"></span><span id="status-text">In attesa</span></span>
+    <span id="status-label"></span>
+  </div>
+  <pre id="log"></pre>
+</div>
+
+<div class="modal-backdrop" id="confirm-modal" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+    <h2 id="confirm-modal-title">Conferma creazione voucher</h2>
+    <ul>
+      <li>I voucher creati non possono essere eliminati. In caso di errori dovrai correggerli manualmente su Tustena.</li>
+      <li>Gli orari di inizio/fine sono proposti di default a cascata (a partire dalle 09:00): se ci sono due allocazioni da 8 ore nello stesso giorno, la seconda sarà fuori orario lavorativo. Modificali manualmente se necessario.</li>
+    </ul>
+    <label class="modal-skip-label">
+      <input type="checkbox" id="confirm-skip-checkbox" />
+      Non mostrare più
+    </label>
+    <div class="modal-actions">
+      <button type="button" class="btn-back" id="confirm-cancel-btn">Annulla</button>
+      <button type="button" class="btn" id="confirm-ok-btn">Conferma e crea</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="help-modal" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
+    <h2 id="help-modal-title">Come funziona</h2>
+    <div class="help-section">
+      <h3>Tustena</h3>
+      <p>Esporta le allocazioni da Float, carica il CSV e seleziona il periodo. Il file più recente in Downloads viene caricato automaticamente. La variabile d'ambiente <code>TUSTENA_API_KEY</code> precompila il rispettivo campo.</p>
+    </div>
+    <div class="help-section">
+      <h3>Tustena+Float</h3>
+      <p>Le allocazioni vengono recuperate direttamente da Float tramite API. Al termine, vengono automaticamente marcate come <em>completate</em> su Float. La variabile d'ambiente <code>FLOAT_API_KEY</code> precompila il rispettivo campo.</p>
+    </div>
+    <div class="help-section">
+      <h3>Nota</h3>
+      <p>Dopo la creazione dei voucher è necessario inviare manualmente la mail del rapportino da Tustena. L'invio automatico può essere implementato tramite l'API.</p>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="help-ok-btn">OK</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+
+</body>
+</html>

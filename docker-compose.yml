@@ -1,0 +1,13 @@
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "80:5000"
+    environment:
+      - TUSTENA_API_KEY
+      - FLOAT_API_KEY
+    volumes:
+      - ~/Downloads:/root/Downloads:ro
+      - ./app:/app/app
+      - ./mappings:/app/mappings
