@@ -229,8 +229,8 @@ document.getElementById('form').addEventListener('submit', async e => {
     fetchInit = { method: 'POST', body: fd };
   } else {
     const body = { tustena_api_key: lastTustenaApiKey };
-    const floatEl2  = document.getElementById('float_api_key');
-    if (floatEl2)  body.float_api_key = lastFloatApiKey = floatEl2.value.trim();
+    const floatEl = document.getElementById('float_api_key');
+    if (floatEl) body.float_api_key = lastFloatApiKey = floatEl.value.trim();
     if (activeTab === 'single') {
       body.date = document.getElementById('date').value;
     } else {
@@ -266,21 +266,20 @@ document.getElementById('form').addEventListener('submit', async e => {
 function renderPreview(allocations) {
   previewData = allocations;
 
-  // Group by date
+  // Group by date, keeping original previewData index
   const byDate = {};
-  allocations.forEach(t => {
+  allocations.forEach((t, i) => {
     if (!byDate[t.start_date]) byDate[t.start_date] = [];
-    byDate[t.start_date].push(t);
+    byDate[t.start_date].push({ t, i });
   });
 
   // Cascade times: first task of each day starts at 09:00
   const timeMap = {};
-  let i = 0;
   Object.keys(byDate).sort().forEach(date => {
     let cursor = 9 * 60;
-    byDate[date].forEach(t => {
+    byDate[date].forEach(({ t, i }) => {
       const end = cursor + t.hours * 60;
-      timeMap[i++] = { start: minsToTime(cursor), end: minsToTime(end) };
+      timeMap[i] = { start: minsToTime(cursor), end: minsToTime(end) };
       cursor = end;
     });
   });
@@ -288,17 +287,16 @@ function renderPreview(allocations) {
   // Render rows
   const list = document.getElementById('voucher-list');
   list.innerHTML = '';
-  let idx = 0;
   Object.keys(byDate).sort().forEach(date => {
     const sep = document.createElement('div');
     sep.className = 'voucher-date-sep';
     sep.textContent = formatDate(date);
     list.appendChild(sep);
 
-    byDate[date].forEach(t => {
-      const { start, end } = timeMap[idx];
+    byDate[date].forEach(({ t, i }) => {
+      const { start, end } = timeMap[i];
       const row = document.createElement('div');
-      row.dataset.idx = idx;
+      row.dataset.idx = i;
 
       if (t.error) {
         row.className = 'voucher-row voucher-error';
@@ -334,7 +332,7 @@ function renderPreview(allocations) {
                 <input type="time" data-field="end" value="${end}" />
               </div>
               <div class="vf vf-summary">
-                <span class="voucher-duration" data-dur="${idx}"></span>
+                <span class="voucher-duration"></span>
                 <span class="vf-expected">Previsto: ${t.hours}h</span>
               </div>
             </div>
@@ -348,7 +346,6 @@ function renderPreview(allocations) {
       }
 
       list.appendChild(row);
-      idx++;
     });
   });
 
@@ -601,12 +598,12 @@ confirmOkBtn.addEventListener('click', async () => {
   const tasks = previewData.reduce((acc, t, i) => {
     if (t.error || t.exists) return acc;
     const row = document.querySelector(`.voucher-row[data-idx="${i}"]`);
-    const descEl = row && row.querySelector('.voucher-description');
+    if (!row) return acc;
     acc.push({
       ...t,
       start_time:  row.querySelector('[data-field="start"]').value,
       end_time:    row.querySelector('[data-field="end"]').value,
-      description: descEl ? descEl.value : '',
+      description: row.querySelector('.voucher-description').value,
     });
     return acc;
   }, []);

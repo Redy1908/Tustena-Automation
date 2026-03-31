@@ -94,7 +94,7 @@ def _enrich_and_check(tasks: list, api_key: str, tustena_user_id: str) -> list:
     for task in ok_tasks:
         task["exists"] = f"{task['client_name']} / {task['project_name']}" in subjects.get((task["company_id"], task["start_date"]), set())
 
-    return resolved
+    return sorted(resolved, key=lambda t: t["start_date"])
 
 
 def _filter_tasks_by_date(tasks: list, date: str, date_from: str, date_to: str) -> list:
