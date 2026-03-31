@@ -9,4 +9,4 @@ COPY app/ app/
 
 EXPOSE 5000
 
-CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:5000", "--timeout", "300", "--reload", "--chdir", "/app/app", "web_app:app"]
+CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:5000", "--timeout", "300", "--chdir", "/app/app", "web_app:app"]
