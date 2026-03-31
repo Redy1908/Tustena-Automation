@@ -651,10 +651,12 @@ confirmOkBtn.addEventListener('click', async () => {
     });
     statusDot.className = hasErrors ? 'status-dot error' : 'status-dot ok';
     statusText.textContent = hasErrors ? 'Completato con errori' : 'Completato';
+    if (hasErrors) { btn.disabled = false; }
   } catch (err) {
     statusDot.className = 'status-dot error';
     statusText.textContent = 'Errore';
     log.innerHTML = `<span class="line-err">${err.message}</span>`;
+    btn.disabled = false;
   } finally {
     btn.textContent = 'Crea Voucher';
   }
