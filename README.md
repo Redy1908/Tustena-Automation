@@ -17,8 +17,8 @@ Permettono di pre-compilare i campi nell'UI al primo avvio:
 | Variabile         | Descrizione                                          |
 | ----------------- | ---------------------------------------------------- |
 | `TUSTENA_API_KEY` | API Key Tustena (da SETUP > UTENTI nel CRM)          |
-| `FLOAT_API_KEY`   | API Key Float (da Settings nel tuo profilo)          |
-| `FLOAT_ICAL_URL`  | URL del feed iCal personale di Float |
+| `FLOAT_API_KEY`   | API Key Float (Al momento non disponibile)           |
+| `FLOAT_ICAL_URL`  | URL del feed iCal personale di Float                 |
 
 ```bash
 export TUSTENA_API_KEY=la-tua-key
