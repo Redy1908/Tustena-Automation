@@ -10,5 +10,4 @@ services:
       - FLOAT_ICAL_URL
     volumes:
       - ~/Downloads:/root/Downloads:ro
-      - ./app:/app/app
-      - ./mappings:/app/mappings
+      - ./mappings:/mappings
