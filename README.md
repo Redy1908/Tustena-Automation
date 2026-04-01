@@ -94,6 +94,12 @@ Voucher B: 13:00 → 17:00
 
 Gli orari sono modificabili nell'anteprima prima della creazione se necessario.
 
+## Changelog
+
+### 01/04/2026
+- **feat**: aggiunto flusso **Tustena+iCal** — recupera le allocazioni dal feed iCal personale di Float senza richiedere la API Key Float
+- **feat**: filtro festività italiane nel flusso iCal (via Nager.Date) — _sperimentale_: se disattivato, verificare manualmente le date dei voucher per evitare di crearne in giorni festivi
+
 ## Sviluppi futuri
 
 - **Invio email automatico**: invio automatico della mail di rapportino da Tustena al termine della creazione dei voucher.
