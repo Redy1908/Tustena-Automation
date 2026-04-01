@@ -1,14 +1,34 @@
+import logging
 import re
 from datetime import date, timedelta, datetime
 
+import requests
 from icalendar import Calendar
 
+logger = logging.getLogger(__name__)
 
 _WORKDAY_START = datetime.strptime("09:00", "%H:%M")
 _HOURS_RE = re.compile(r'\((\d+(?:\.\d+)?)h\)')
 
 
-def parse_ical_feed(ical_text: str) -> list[dict]:
+def _italian_holidays(years: set[int]) -> set[str]:
+    """Fetch Italian public holidays from Nager.Date for the given years."""
+    holidays: set[str] = set()
+    for year in years:
+        try:
+            resp = requests.get(
+                f'https://date.nager.at/api/v3/PublicHolidays/{year}/IT',
+                timeout=5,
+            )
+            resp.raise_for_status()
+            for h in resp.json():
+                holidays.add(h['date'])
+        except Exception as exc:
+            logger.warning('Could not fetch Italian holidays for %s: %s', year, exc)
+    return holidays
+
+
+def parse_ical_feed(ical_text: str, skip_holidays: bool = True) -> list[dict]:
     cal = Calendar.from_ical(ical_text)
 
     day_cursor: dict = {}
@@ -62,5 +82,10 @@ def parse_ical_feed(ical_text: str) -> list[dict]:
                 'hours':        hours,
             })
             current += timedelta(days=1)
+
+    if skip_holidays and tasks:
+        years = {int(t['start_date'][:4]) for t in tasks}
+        holidays = _italian_holidays(years)
+        tasks = [t for t in tasks if t['start_date'] not in holidays]
 
     return sorted(tasks, key=lambda t: t['start_date'])

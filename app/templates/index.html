@@ -56,6 +56,13 @@
         <input type="url" id="ical_url" name="ical_url" placeholder="https://…/ical/…" value="{{ float_ical_url }}" />
         <span class="field-error-msg" id="err-ical-url">Inserisci l'URL iCal di Float.</span>
       </div>
+      <div class="field-checkbox">
+        <label class="checkbox-label">
+          <input type="checkbox" id="skip_holidays" checked />
+          Escludi festività italiane
+          <span class="badge-experimental">sperimentale</span>
+        </label>
+      </div>
     </div>
 
     <div id="mode-csv">

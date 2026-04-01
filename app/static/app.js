@@ -158,6 +158,15 @@ document.querySelectorAll('.tab').forEach(btn => {
   document.getElementById(id)?.addEventListener(ev, () => clearError(id, errId))
 );
 
+document.getElementById('skip_holidays').addEventListener('change', function () {
+  if (!this.checked) {
+    const confirmed = window.confirm(
+      'Attenzione: disattivando questo filtro potresti creare voucher in giorni festivi.\n\nVuoi continuare?'
+    );
+    if (!confirmed) this.checked = true;
+  }
+});
+
 /* ── Form validation ──────────────────────────────────────────────────────── */
 
 function validate() {
@@ -241,7 +250,11 @@ document.getElementById('form').addEventListener('submit', async e => {
     fetchUrl  = '/preview_csv';
     fetchInit = { method: 'POST', body: fd };
   } else if (isIcalMode()) {
-    const body = { tustena_api_key: lastTustenaApiKey, ical_url: lastFloatICalUrl};
+    const body = {
+      tustena_api_key: lastTustenaApiKey,
+      ical_url: lastFloatICalUrl,
+      skip_holidays: document.getElementById('skip_holidays').checked,
+    };
     if (activeTab === 'single') {
       body.date = document.getElementById('date').value;
     } else if (activeTab === 'range') {

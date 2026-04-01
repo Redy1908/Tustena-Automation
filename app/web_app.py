@@ -242,7 +242,8 @@ def preview_ical():
         resp = requests.get(ical_url, timeout=30)
         resp.raise_for_status()
 
-        tasks = parse_ical_feed(resp.text)
+        skip_holidays = data.get("skip_holidays", True)
+        tasks = parse_ical_feed(resp.text, skip_holidays=skip_holidays)
         tasks = _filter_tasks_by_date(
             tasks,
             data.get("date", "").strip(),
@@ -287,4 +288,4 @@ def run():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5001, debug=False)
