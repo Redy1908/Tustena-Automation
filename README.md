@@ -14,14 +14,16 @@ L'app sarà disponibile su `http://localhost`.
 
 Permettono di pre-compilare i campi nell'UI al primo avvio:
 
-| Variabile         | Descrizione                                 |
-| ----------------- | ------------------------------------------- |
-| `TUSTENA_API_KEY` | API Key Tustena (da SETUP > UTENTI nel CRM) |
-| `FLOAT_API_KEY`   | API Key Float (Al momento non disponibile)  |
+| Variabile         | Descrizione                                          |
+| ----------------- | ---------------------------------------------------- |
+| `TUSTENA_API_KEY` | API Key Tustena (da SETUP > UTENTI nel CRM)          |
+| `FLOAT_API_KEY`   | API Key Float (Al momento non disponibile)           |
+| `FLOAT_ICAL_URL`  | URL del feed iCal personale di Float                 |
 
 ```bash
 export TUSTENA_API_KEY=la-tua-key
 export FLOAT_API_KEY=la-tua-float-key
+export FLOAT_ICAL_URL=https://kiratech.float.com/ical/...
 docker compose up --build -d
 ```
 
@@ -57,6 +59,19 @@ Al termine le allocazioni Float vengono automaticamente marcate come **completat
 
 > Dopo la creazione, invia manualmente la mail di rapportino da Tustena CRM.
 
+### Flusso Tustena+iCal
+
+Usa il feed iCal personale di Float per recuperare le allocazioni, senza richiedere la API Key Float. Le allocazioni non vengono marcate come completate su Float.
+
+1. Inserisci la tua **API Key Tustena**
+2. Seleziona il chip **Tustena+iCal** e inserisci l'**URL iCal** di Float
+3. Seleziona il periodo (**Tutti**, **Giorno** o **Periodo**)
+4. Clicca **Anteprima** e rivedi i voucher
+5. Compila il contenuto del rapportino per ogni voucher
+6. Clicca **Crea Voucher**
+
+> Dopo la creazione, invia manualmente la mail di rapportino da Tustena CRM.
+
 ## Risoluzione mismatch nomi
 
 Se nell'anteprima compaiono voucher **con errore**, significa che il nome azienda o servizio su Float non corrisponde esattamente a quello su Tustena. Usa la ricerca integrata nel banner dell'app per trovare il nome corretto, poi aggiorna i file nella cartella `mappings/`:
@@ -81,5 +96,4 @@ Gli orari sono modificabili nell'anteprima prima della creazione se necessario.
 
 ## Sviluppi futuri
 
-- **Calendario iCal**: importazione diretta dal link iCal personale di Float, senza dover esportare manualmente il CSV
 - **Invio email automatico**: invio automatico della mail di rapportino da Tustena al termine della creazione dei voucher.

@@ -123,6 +123,7 @@ label {
 
 input[type="password"],
 input[type="text"],
+input[type="url"],
 input[type="date"],
 input[type="time"] {
   width: 100%;
@@ -140,6 +141,7 @@ input[type="time"] {
 
 input[type="password"]:focus,
 input[type="text"]:focus,
+input[type="url"],
 input[type="date"]:focus,
 input[type="time"]:focus {
   border-color: var(--primary);
@@ -159,6 +161,34 @@ textarea.input-error {
 }
 
 .field-error-msg.visible { display: block; }
+
+.field-checkbox {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.badge-experimental {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--warning, #d97706);
+  border: 1px solid var(--warning, #d97706);
+  border-radius: 4px;
+  padding: 1px 5px;
+  opacity: 0.8;
+}
 
 .form-error {
   display: none;
@@ -622,6 +652,26 @@ textarea.input-error {
 }
 
 .step2-footer { margin-top: 1.25rem; }
+
+.holiday-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  background: #FEF9C3;
+  border: 1px solid #FDE047;
+  border-radius: 8px;
+  color: #713F12;
+  font-size: 0.82rem;
+}
+
+.holiday-warning svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: #CA8A04;
+}
 
 .execute-wrap {
   display: flex;
