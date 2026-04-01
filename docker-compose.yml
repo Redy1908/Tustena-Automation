@@ -3,7 +3,7 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "80:5000"
+      - "5001:5001"
     environment:
       - TUSTENA_API_KEY
       - FLOAT_API_KEY

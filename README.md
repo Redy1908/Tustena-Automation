@@ -8,7 +8,7 @@ Strumento per creare automaticamente i **Voucher Intervento** su **Tustena CRM**
 docker compose up --build -d
 ```
 
-L'app sarà disponibile su `http://localhost`.
+L'app sarà disponibile su `http://localhost:5001`.
 
 ### Variabili d'ambiente (opzionali)
 
