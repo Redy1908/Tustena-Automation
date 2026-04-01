@@ -101,7 +101,7 @@ h1 span { color: var(--primary); }
   box-shadow: var(--shadow);
 }
 
-#step2 { max-width: 1100px; display: none; margin-top: 1.5rem; }
+#main-view { max-width: 1100px; display: none; margin-top: 1.5rem; }
 
 /* ── Fields ───────────────────────────────────────────────────────────────── */
 
@@ -1026,4 +1026,106 @@ textarea.input-error {
   border-radius: 4px;
   padding: 0.1rem 0.35rem;
   color: var(--text);
+}
+
+/* ── New Workflow Styles ─────────────────────────────────────────────────── */
+
+.settings-header {
+  margin-bottom: 1.5rem;
+}
+.settings-header h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+.settings-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+  gap: 1rem;
+}
+
+.week-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-align: center;
+  min-width: 15rem;
+}
+
+.btn-icon {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.btn-icon:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.legacy-preview-wrapper {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: center;
+}
+
+.vf-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-run-row {
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+  width: auto;
+  border-radius: 6px;
+  min-width: 6rem;
+  transition: background 0.2s, color 0.2s, opacity 0.2s;
+}
+
+.voucher-row-running {
+  border-color: var(--warning) !important;
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.voucher-success {
+  border-color: var(--success) !important;
+  background: rgba(16, 185, 129, 0.05);
+  opacity: 0.6;
+}
+
+.spinner {
+  animation: rotate 2s linear infinite;
+  stroke: var(--primary);
+}
+.spinner .path {
+  stroke: var(--primary);
+  stroke-linecap: round;
+  animation: dash 1.5s ease-in-out infinite;
+}
+
+@keyframes rotate { 100% { transform: rotate(360deg); } }
+@keyframes dash {
+  0% { stroke-dasharray: 1, 150; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 90, 150; stroke-dashoffset: -35; }
+  100% { stroke-dasharray: 90, 150; stroke-dashoffset: -124; }
 }

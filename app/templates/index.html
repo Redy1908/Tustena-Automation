@@ -9,7 +9,6 @@
 </head>
 <body>
 
-
 <button class="theme-toggle" id="help-btn" aria-label="Aiuto" style="right: 3.75rem; position: fixed; top: 1rem;">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
 </button>
@@ -21,13 +20,12 @@
 
 <h1>Float <span>→</span> Tustena</h1>
 
-<div class="card" id="step1">
-  <form id="form">
-
-    <div class="mode-selector">
-      <button type="button" class="mode-chip active" data-mode="csv">Tustena</button>
-      <button type="button" class="mode-chip" data-mode="float">Tustena+Float</button>
-      <button type="button" class="mode-chip" data-mode="ical">Tustena+iCal</button>
+<!-- SETTINGS VIEW -->
+<div class="card" id="settings-view" style="display:none">
+  <form id="settings-form">
+    <div class="settings-header">
+      <h2>Impostazioni</h2>
+      <span class="settings-subtitle">Configura le chiavi e i link necessari.</span>
     </div>
 
     <div class="field">
@@ -42,95 +40,80 @@
       <span class="field-error-msg" id="err-tustena-api-key">Inserisci l'API key Tustena.</span>
     </div>
 
-    <div id="mode-float" style="display:none">
-      <div class="field">
-        <label>Float API Key</label>
-        <input type="password" id="float_api_key" name="float_api_key" placeholder="float-api-key" value="{{ float_api_key }}" />
-        <span class="field-error-msg" id="err-float-api-key">Inserisci la Float API key.</span>
-      </div>
-    </div>
-
-    <div id="mode-ical" style="display:none">
-      <div class="field">
-        <label>Float iCal URL</label>
-        <input type="url" id="ical_url" name="ical_url" placeholder="https://…/ical/…" value="{{ float_ical_url }}" />
-        <span class="field-error-msg" id="err-ical-url">Inserisci l'URL iCal di Float.</span>
-      </div>
-      <div class="field-checkbox">
-        <label class="checkbox-label">
-          <input type="checkbox" id="skip_holidays" checked />
-          Escludi festività italiane
-          <span class="badge-experimental">sperimentale</span>
-        </label>
-      </div>
-    </div>
-
-    <div id="mode-csv">
-      <div class="field">
-        <label>
-          File CSV Float
-          <span class="info-icon" tabindex="0" aria-label="Come esportare da Float">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-            <span class="tooltip">Float → Filtra "Me" → Share → Export .csv → Day</span>
-          </span>
-        </label>
-        <div class="drop-zone" id="csv_drop_zone">
-          <input type="file" id="csv_file" accept=".csv" hidden />
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="drop-zone-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span class="drop-zone-text">Trascina il CSV qui o <u>clicca per sceglierlo</u></span>
-          <span class="drop-zone-filename" id="csv_filename"></span>
-        </div>
-        <span class="field-error-msg" id="err-csv-file">Seleziona un file CSV.</span>
-      </div>
-    </div>
-
     <div class="field">
-      <label>Periodo</label>
-      <div class="date-tabs">
-        <button type="button" class="tab active" data-tab="all">Tutti</button>
-        <button type="button" class="tab" data-tab="single">Giorno</button>
-        <button type="button" class="tab" data-tab="range" style="display:none">Intervallo</button>
+      <label>Float iCal URL</label>
+      <input type="url" id="ical_url" name="ical_url" placeholder="https://…/ical/…" value="{{ float_ical_url }}" />
+      <span class="field-error-msg" id="err-ical-url">Inserisci l'URL iCal di Float.</span>
+    </div>
+
+    <div class="field-checkbox">
+      <label class="checkbox-label">
+        <input type="checkbox" id="skip_holidays" checked />
+        Escludi festività italiane
+      </label>
+    </div>
+
+    <!-- Legacy / Advanced options -->
+    <div class="field-checkbox" style="margin-top: 1.5rem">
+      <label class="checkbox-label" style="font-weight: 500;">
+        <input type="checkbox" id="advanced_toggle" />
+        Mostra opzioni legacy (CSV / API)
+      </label>
+    </div>
+
+    <div id="advanced-container" style="display:none; padding-top: 1rem; border-top: 1px solid var(--border); margin-bottom: 1rem;">
+      <div class="mode-selector">
+        <button type="button" class="mode-chip active" data-mode="none">Nessuno</button>
+        <button type="button" class="mode-chip" data-mode="csv">CSV</button>
+        <button type="button" class="mode-chip" data-mode="float">Float API</button>
       </div>
-      <div id="tab-all" class="date-panel"></div>
-      <div id="tab-single" class="date-panel" style="display:none">
-        <div class="date-input-wrap">
-          <input type="date" id="date" name="date" />
+
+      <div id="mode-csv" style="display:none">
+        <div class="field">
+          <label>File CSV Float</label>
+          <div class="drop-zone" id="csv_drop_zone">
+            <input type="file" id="csv_file" accept=".csv" hidden />
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="drop-zone-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span class="drop-zone-text">Trascina il CSV qui o <u>clicca per sceglierlo</u></span>
+            <span class="drop-zone-filename" id="csv_filename"></span>
+          </div>
+          <span class="field-error-msg" id="err-csv-file">Seleziona un file CSV.</span>
         </div>
-        <span class="field-error-msg" id="err-date">Seleziona un giorno.</span>
       </div>
-      <div id="tab-range" class="date-panel" style="display:none">
-        <div class="date-range-row">
-          <div class="date-input-wrap">
-            <input type="date" id="date_from" name="date_from" />
-          </div>
-          <span class="range-sep">→</span>
-          <div class="date-input-wrap">
-            <input type="date" id="date_to" name="date_to" />
-          </div>
+
+      <div id="mode-float" style="display:none">
+        <div class="field">
+          <label>Float API Key</label>
+          <input type="password" id="float_api_key" name="float_api_key" placeholder="float-api-key" value="{{ float_api_key }}" />
+          <span class="field-error-msg" id="err-float-api-key">Inserisci la Float API key.</span>
         </div>
-        <span class="field-error-msg" id="err-date-range">Seleziona entrambe le date dell'intervallo.</span>
+      </div>
+      
+      <div class="warning-banner" style="margin-top: 0;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span style="flex:1">Nota: In modalità legacy, l'esecuzione sarà forzata solo sulla <b>settimana corrente</b>. Il caricamento di CSV richiederà un click extra su 'Anteprima' prima di far apparire la lista.</span>
       </div>
     </div>
 
-    <button class="btn" type="submit" id="preview-btn">Anteprima →</button>
+    <button class="btn" type="submit" id="save-settings-btn" style="margin-top: 0.5rem;">Salva ed entra →</button>
     <div class="form-error" id="form-error"></div>
   </form>
+  <div class="contact-box" style="margin-top: 1.5rem;">
+    <span>Problemi o suggerimenti?</span>
+    <a href="https://github.com/Redy1908/Tustena-Automation" target="_blank" rel="noopener">GitHub</a>
+  </div>
 </div>
 
-<div class="contact-box">
-  <span>Problemi o suggerimenti?</span>
-  <a href="https://github.com/Redy1908/Tustena-Automation" target="_blank" rel="noopener">GitHub</a>
-</div>
-
-<div class="warning-banner" id="warning-banner-full">
+<!-- WARNING FULL -->
+<div class="warning-banner" id="warning-banner-full" style="display:none;">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
   <div class="warning-body">
     <div class="warning-summary" id="warning-toggle">
-      <span>Alcune allocazioni possono fallire.</span>
-      <span class="warning-expand-hint">Come risolvere <svg class="warning-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+      <span>Alcune allocazioni possono fallire per mismatch nomi. Clicca per mappare i nomi.</span>
+      <span class="warning-expand-hint">Apri Mappings <svg class="warning-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
     </div>
     <div class="warning-details" id="warning-details" style="display:none">
-      <span>Alcune allocazioni possono fallire per un mismatch tra il nome dell'azienda su Float e il corrispondente su Tustena. Per risolvere, cerca il nome esatto su Tustena tramite il campo qui sotto e aggiungilo nel file <code>mappings/company_mapping.json</code> nella forma <code>"nome Float": "nome Tustena"</code>.</span>
+      <span>Alcune allocazioni possono fallire per un mismatch tra il nome dell'azienda su Float e il corrispondente su Tustena. Per risolvere, cerca il nome esatto su Tustena tramite il campo qui sotto e aggiungilo nel file <code>mappings/company_mapping.json</code>.</span>
       <div class="company-search">
         <div class="company-search-row">
           <input type="text" id="company-search-input" placeholder="Cerca azienda su Tustena…" />
@@ -138,10 +121,10 @@
         </div>
         <ul id="company-search-results" class="search-results"></ul>
       </div>
-      <span>Lo stesso vale per i servizi: se la descrizione del servizio su Float non corrisponde al <code>catalogDescription</code> su Tustena, cerca i servizi disponibili per un contratto e aggiorna <code>mappings/service_mapping.json</code> nella forma <code>"nome Float": "nome Tustena"</code>.</span>
+      <span>Lo stesso vale per i servizi: cerca i servizi disponibili per un contratto e aggiorna <code>mappings/service_mapping.json</code>.</span>
       <div class="company-search">
         <div class="company-search-row">
-          <input type="text" id="service-company-input" placeholder="Azienda (nome Tustena)…" />
+          <input type="text" id="service-company-input" placeholder="Azienda…" />
           <input type="text" id="service-contract-input" placeholder="Codice contratto…" />
           <button type="button" id="service-search-btn">Cerca</button>
         </div>
@@ -151,13 +134,27 @@
   </div>
 </div>
 
-<div class="warning-banner warning-banner--compact" id="warning-banner-compact" style="display:none">
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-  <span>Alcuni voucher hanno un mismatch tra Float e Tustena. Usa la ricerca nel banner iniziale per trovare i nomi corretti e aggiornare i file di mapping.</span>
-  <button type="button" class="warning-back-btn" id="warning-back-btn">← Torna al form</button>
-</div>
+<!-- MAIN VIEW (Voucher Dashboard) -->
+<div class="card" id="main-view" style="display:none">
+  
+  <div class="week-nav">
+    <button type="button" class="btn-icon" id="week-prev-btn" aria-label="Settimana Precedente">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="week-title" id="week-title">
+      Caricamento...
+    </div>
+    <button type="button" class="btn-icon" id="week-next-btn" aria-label="Settimana Successiva">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+    
+    <div style="flex:1"></div>
+    
+    <button type="button" class="btn-back" id="view-settings-btn">
+      Impostazioni
+    </button>
+  </div>
 
-<div class="card" id="step2">
   <div class="step2-header">
     <div class="step2-counts">
       <span id="step2-count" class="step2-count"></span>
@@ -166,48 +163,23 @@
     </div>
     <div class="step2-actions">
       <button type="button" class="btn-toggle-exists" id="toggle-exists-btn" style="display:none">Nascondi già presenti</button>
-      <button type="button" class="btn-back" id="back-btn">← Modifica</button>
     </div>
   </div>
+
   <div class="holiday-warning" id="holiday-warning" style="display:none">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
     Filtro festività disattivato. Controlla le date prima di creare i voucher.
   </div>
-  <div id="voucher-list"></div>
-  <div class="step2-footer">
-    <div class="execute-wrap">
-      <button class="btn" id="execute-btn">Crea Voucher</button>
-      <span class="execute-warning" id="execute-warning">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <span class="execute-warning-tip"></span>
-      </span>
+
+  <div id="voucher-list">
+    <div class="loading-state" id="loading-state">
+      <svg class="spinner" viewBox="0 0 50 50"><circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle></svg>
+      <span>Recupero allocazioni in corso...</span>
     </div>
   </div>
-</div>
 
-<div class="output-card" id="output-card">
-  <div class="output-header">
-    <span><span class="status-dot" id="status-dot"></span><span id="status-text">In attesa</span></span>
-    <span id="status-label"></span>
-  </div>
-  <pre id="log"></pre>
-</div>
-
-<div class="modal-backdrop" id="confirm-modal" aria-hidden="true">
-  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
-    <h2 id="confirm-modal-title">Conferma creazione voucher</h2>
-    <ul>
-      <li>I voucher creati non possono essere eliminati. In caso di errori dovrai correggerli manualmente su Tustena.</li>
-      <li>Gli orari di inizio/fine sono proposti di default a cascata (a partire dalle 09:00): se ci sono due allocazioni da 8 ore nello stesso giorno, la seconda sarà fuori orario lavorativo. Modificali manualmente se necessario.</li>
-    </ul>
-    <label class="modal-skip-label">
-      <input type="checkbox" id="confirm-skip-checkbox" />
-      Non mostrare più
-    </label>
-    <div class="modal-actions">
-      <button type="button" class="btn-back" id="confirm-cancel-btn">Annulla</button>
-      <button type="button" class="btn" id="confirm-ok-btn">Conferma e crea</button>
-    </div>
+  <div class="legacy-preview-wrapper" id="legacy-preview-wrapper" style="display:none;">
+    <button class="btn" id="legacy-preview-btn">Mostra Anteprima CSV/API</button>
   </div>
 </div>
 
@@ -229,20 +201,20 @@
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
     <h2 id="help-modal-title">Come funziona</h2>
     <div class="help-section">
-      <h3>Tustena</h3>
-      <p>Esporta le allocazioni da Float, carica il CSV e seleziona il periodo. Il file più recente in Downloads viene caricato automaticamente. La variabile d'ambiente <code>TUSTENA_API_KEY</code> precompila il rispettivo campo.</p>
+      <h3>Il Nuovo Workflow</h2>
+      <p>L'applicazione ora ragiona per <strong>Settimane</strong>. Imposta l'URL di <strong>Float iCal</strong> nelle Impostazioni e i voucher appariranno automaticamente divisi per giorno.</p>
     </div>
     <div class="help-section">
-      <h3>Tustena+Float</h3>
-      <p>Le allocazioni vengono recuperate direttamente da Float tramite API. Al termine, vengono automaticamente marcate come <em>completate</em> su Float. La variabile d'ambiente <code>FLOAT_API_KEY</code> precompila il rispettivo campo.</p>
+      <h3>Creazione Puntuale</h3>
+      <p>Non c'è più un singolo bottone "Crea Voucher". Clicca <strong>Crea</strong> in corrispondenza del voucher per inviarlo a Tustena. L'operazione non può essere annullata, le modifiche andranno fatte su Tustena.</p>
     </div>
     <div class="help-section">
-      <h3>Tustena+iCal</h3>
-      <p>Le allocazioni vengono recuperate dal feed iCal di Float configurato tramite la variabile d'ambiente <code>FLOAT_ICAL_URL</code> sul server. Non richiede una Float API key. Le allocazioni non vengono marcate come completate su Float.</p>
+      <h3>Modi Funzionali (Legacy)</h3>
+      <p>Le modalità "Tustena+Float API" e "CSV" sono deprecate e nascoste dietro l'opzione "Avanzate" nelle Impostazioni. Sono limitate all'anteprima forzata della settimana corrente selezionata nella dashboard.</p>
     </div>
     <div class="help-section">
       <h3>Nota</h3>
-      <p>Dopo la creazione dei voucher è necessario inviare manualmente la mail del rapportino da Tustena. L'invio automatico può essere implementato tramite l'API.</p>
+      <p>Dopo la creazione dei voucher è necessario inviare manualmente la mail del rapportino da Tustena.</p>
     </div>
     <div class="modal-actions">
       <button type="button" class="btn" id="help-ok-btn">OK</button>
