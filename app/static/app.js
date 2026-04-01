@@ -434,6 +434,7 @@ function renderPreview(allocations) {
   document.getElementById('warning-banner-compact').style.display = '';
   document.getElementById('holiday-warning').style.display = (isIcalMode() && !skipHolidaysCb.checked) ? '' : 'none';
   updateExecuteState();
+  history.pushState({ step: 'preview' }, '', '#preview');
 }
 
 function updateDateSeparators() {
@@ -518,7 +519,7 @@ function updateDuration(row, expectedHours) {
   durEl.className = actualMins !== expectedMins ? 'voucher-duration voucher-hours--diff' : 'voucher-duration';
 }
 
-function goBack() {
+function _goBackUI() {
   document.getElementById('step2').style.display              = 'none';
   document.getElementById('step1').style.display              = 'block';
   document.getElementById('output-card').style.display        = 'none';
@@ -526,6 +527,15 @@ function goBack() {
   document.getElementById('warning-banner-compact').style.display = 'none';
   document.getElementById('log').innerHTML = '';
 }
+
+function goBack() {
+  _goBackUI();
+  if (location.hash === '#preview') history.back();
+}
+
+window.addEventListener('popstate', () => {
+  if (document.getElementById('step2').style.display !== 'none') _goBackUI();
+});
 
 document.getElementById('back-btn').addEventListener('click', goBack);
 document.getElementById('warning-back-btn').addEventListener('click', goBack);
