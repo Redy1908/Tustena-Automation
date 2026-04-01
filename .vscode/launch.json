@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Flask App",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/app/web_app.py",
+            "env": {
+                "FLASK_ENV": "development",
+                "FLASK_DEBUG": "1"
+            },
+            "envFile": "${workspaceFolder}/.env",
+            "cwd": "${workspaceFolder}/app",
+            "console": "integratedTerminal",
+            "jinja": true
+        }
+    ]
+}
