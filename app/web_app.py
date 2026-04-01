@@ -66,7 +66,7 @@ def _resolve_tustena_ids(task: dict, api_key: str, cache: dict) -> dict:
 
         return {**task, "company_id": company_id, "contract_id": contract_id, "service_id": service_id}
     except Exception as e:
-        logger.exception("Error enriching task %s", task.get("project_name"))
+        logger.error("Error enriching task %s: %s", task.get("project_name"), e)
         msg, _ = _friendly_error(e)
         return {**task, "error": msg}
 
@@ -89,8 +89,8 @@ def _enrich_and_check(tasks: list, api_key: str, tustena_user_id: str) -> list:
     for company_id, (date_from, date_to) in company_dates.items():
         try:
             subjects |= {(company_id, day): s for day, s in tustena_get_existing_voucher_subjects(date_from, date_to, company_id, api_key, tustena_user_id).items()}
-        except Exception:
-            logger.exception("Failed to fetch existing subjects for company %s (%s – %s)", company_id, date_from, date_to)
+        except Exception as e:
+            logger.error("Failed to fetch existing subjects for company %s (%s – %s): %s", company_id, date_from, date_to, e)
 
     for task in ok_tasks:
         task["exists"] = f"{task['client_name']} / {task['project_name']}" in subjects.get((task["company_id"], task["start_date"]), set())
