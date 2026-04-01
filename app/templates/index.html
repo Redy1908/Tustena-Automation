@@ -169,6 +169,10 @@
       <button type="button" class="btn-back" id="back-btn">← Modifica</button>
     </div>
   </div>
+  <div class="holiday-warning" id="holiday-warning" style="display:none">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Filtro festività disattivato. Controlla le date prima di creare i voucher.
+  </div>
   <div id="voucher-list"></div>
   <div class="step2-footer">
     <div class="execute-wrap">
@@ -203,6 +207,20 @@
     <div class="modal-actions">
       <button type="button" class="btn-back" id="confirm-cancel-btn">Annulla</button>
       <button type="button" class="btn" id="confirm-ok-btn">Conferma e crea</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="holiday-modal" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="holiday-modal-title">
+    <h2 id="holiday-modal-title">Disattiva filtro festività</h2>
+    <ul>
+      <li>Disattivando questo filtro potresti creare voucher in giorni festivi italiani.</li>
+      <li>Le festività vengono recuperate in tempo reale da <strong>Nager.Date</strong>.</li>
+    </ul>
+    <div class="modal-actions">
+      <button type="button" class="btn-back" id="holiday-cancel-btn">Annulla</button>
+      <button type="button" class="btn" id="holiday-ok-btn">Disattiva</button>
     </div>
   </div>
 </div>

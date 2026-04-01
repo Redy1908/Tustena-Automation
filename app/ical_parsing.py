@@ -24,7 +24,10 @@ def _italian_holidays(years: set[int]) -> set[str]:
             for h in resp.json():
                 holidays.add(h['date'])
         except Exception as exc:
-            logger.warning('Could not fetch Italian holidays for %s: %s', year, exc)
+            raise RuntimeError(
+                f'Impossibile recuperare le festività italiane per il {year} da Nager.Date: {exc}. '
+                'Verifica la connessione o disattiva il filtro festività.'
+            ) from exc
     return holidays
 
 

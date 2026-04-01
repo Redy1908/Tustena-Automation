@@ -36,11 +36,11 @@ document.querySelectorAll('.mode-chip').forEach(chip => {
     document.getElementById('mode-float').style.display = isFloat ? '' : 'none';
     document.getElementById('mode-ical').style.display  = isIcal  ? '' : 'none';
     document.getElementById('mode-csv').style.display   = (isFloat || isIcal) ? 'none' : '';
-    // swap visible tabs: float hides "Tutti", shows "Intervallo"; csv/ical show "Tutti", hide "Intervallo"
-    document.querySelector('.tab[data-tab="all"]').style.display   = isFloat ? 'none' : '';
+    // swap visible tabs: csv shows "Tutti"; float/ical show "Intervallo"
+    document.querySelector('.tab[data-tab="all"]').style.display   = (isFloat || isIcal) ? 'none' : '';
     document.querySelector('.tab[data-tab="range"]').style.display = isFloat || isIcal ? '' : 'none';
     // reset to sensible default for the mode
-    if (isFloat && activeTab === 'all')          _setTab('single');
+    if ((isFloat || isIcal) && activeTab === 'all') _setTab('single');
     if (!isFloat && !isIcal && activeTab === 'range') _setTab('all');
   });
 });
@@ -158,13 +158,28 @@ document.querySelectorAll('.tab').forEach(btn => {
   document.getElementById(id)?.addEventListener(ev, () => clearError(id, errId))
 );
 
-document.getElementById('skip_holidays').addEventListener('change', function () {
+const holidayModal     = document.getElementById('holiday-modal');
+const holidayOkBtn     = document.getElementById('holiday-ok-btn');
+const holidayCancelBtn = document.getElementById('holiday-cancel-btn');
+const skipHolidaysCb   = document.getElementById('skip_holidays');
+
+skipHolidaysCb.addEventListener('change', function () {
   if (!this.checked) {
-    const confirmed = window.confirm(
-      'Attenzione: disattivando questo filtro potresti creare voucher in giorni festivi.\n\nVuoi continuare?'
-    );
-    if (!confirmed) this.checked = true;
+    this.checked = true;
+    holidayModal.classList.add('open');
+    holidayModal.setAttribute('aria-hidden', 'false');
   }
+});
+
+holidayCancelBtn.addEventListener('click', () => {
+  holidayModal.classList.remove('open');
+  holidayModal.setAttribute('aria-hidden', 'true');
+});
+
+holidayOkBtn.addEventListener('click', () => {
+  skipHolidaysCb.checked = false;
+  holidayModal.classList.remove('open');
+  holidayModal.setAttribute('aria-hidden', 'true');
 });
 
 /* ── Form validation ──────────────────────────────────────────────────────── */
@@ -417,6 +432,7 @@ function renderPreview(allocations) {
   document.getElementById('step2').style.display              = 'block';
   document.getElementById('warning-banner-full').style.display    = 'none';
   document.getElementById('warning-banner-compact').style.display = '';
+  document.getElementById('holiday-warning').style.display = (isIcalMode() && !skipHolidaysCb.checked) ? '' : 'none';
   updateExecuteState();
 }
 

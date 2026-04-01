@@ -653,6 +653,26 @@ textarea.input-error {
 
 .step2-footer { margin-top: 1.25rem; }
 
+.holiday-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  background: #FEF9C3;
+  border: 1px solid #FDE047;
+  border-radius: 8px;
+  color: #713F12;
+  font-size: 0.82rem;
+}
+
+.holiday-warning svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: #CA8A04;
+}
+
 .execute-wrap {
   display: flex;
   align-items: center;
