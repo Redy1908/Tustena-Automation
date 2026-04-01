@@ -1,5 +1,8 @@
 # Float → Tustena CRM Automation
 
+[![Tests](https://github.com/Redy1908/Tustena-Automation/actions/workflows/test.yml/badge.svg)](https://github.com/Redy1908/Tustena-Automation/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/Redy1908/Tustena-Automation/graph/badge.svg)](https://codecov.io/gh/Redy1908/Tustena-Automation)
+
 Strumento per creare automaticamente i **Voucher Intervento** su **Tustena CRM** a partire dalle allocazioni **Float**. Elimina la compilazione manuale dei rapportini: importa le allocazioni, rivedi i voucher e confermali in un click.
 
 ## Avvio rapido
@@ -23,7 +26,7 @@ Permettono di pre-compilare i campi nell'UI al primo avvio:
 ```bash
 export TUSTENA_API_KEY=la-tua-key
 export FLOAT_API_KEY=la-tua-float-key
-export FLOAT_ICAL_URL=https://kiratech.float.com/ical/...
+export FLOAT_ICAL_URL=https://ical.float.com/...
 docker compose up --build -d
 ```
 

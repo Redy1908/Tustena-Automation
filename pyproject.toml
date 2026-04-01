@@ -1,0 +1,11 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["app"]
+addopts = "--cov=app --cov-report=term-missing --cov-report=html:htmlcov --cov-report=xml"
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/static/*", "app/templates/*"]
+
+[tool.coverage.report]
+show_missing = true
