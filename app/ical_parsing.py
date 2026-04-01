@@ -17,10 +17,13 @@ def parse_ical_feed(ical_text: str) -> list[dict]:
     for component in cal.walk('VEVENT'):
         summary = str(component.get('SUMMARY', ''))
         parts = [p.strip() for p in summary.split(' / ')]
-        if len(parts) != 4:
+        if len(parts) < 4:
             continue
 
-        task_info, contract_code, service_description, client_name = parts
+        task_info = parts[0]
+        contract_code = parts[1]
+        client_name = parts[-1]
+        service_description = ' / '.join(parts[2:-1])
 
         if contract_code.startswith('INT'):
             continue
