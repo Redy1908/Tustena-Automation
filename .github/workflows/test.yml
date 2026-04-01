@@ -27,4 +27,5 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: codecov/codecov-action@v4
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
