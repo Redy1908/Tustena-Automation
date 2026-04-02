@@ -1,5 +1,6 @@
 import glob
 import logging
+import json
 import os
 import tempfile
 import requests
@@ -43,38 +44,45 @@ def _get_tustena_context(api_key: str) -> tuple[str, str]:
     return template["createdById"], tustena_get_current_user_fullname(api_key)
 
 
-def _resolve_tustena_ids(task: dict, api_key: str, cache: dict) -> dict:
+def _resolve_tustena_ids(task: dict, api_key: str, cache: dict, company_mapping: dict = None, service_mapping: dict = None) -> dict:
+    parts = task.get("project_name", "").split(" / ", 1)
+    contract_code       = parts[0].strip() if parts else ""
+    service_description = parts[1].strip() if len(parts) > 1 else ""
+    name = task.get("client_name", "")
+
     try:
-        parts = task["project_name"].split(" / ", 1)
-        contract_code       = parts[0].strip()
-        service_description = parts[1].strip() if len(parts) > 1 else ""
-
-        name = task["client_name"]
         if name not in cache["companies"]:
-            cache["companies"][name] = tustena_get_company_id(name, api_key)
+            cache["companies"][name] = tustena_get_company_id(name, api_key, overrides=company_mapping)
         company_id = cache["companies"][name]
+    except Exception as e:
+        msg, _ = _friendly_error(e)
+        return {**task, "error": msg, "error_type": "company", "error_query": name}
 
+    try:
         key_c = (company_id, contract_code)
         if key_c not in cache["contracts"]:
             cache["contracts"][key_c] = tustena_get_contract_id(company_id, contract_code, api_key)
         contract_id = cache["contracts"][key_c]
+    except Exception as e:
+        msg, _ = _friendly_error(e)
+        return {**task, "error": msg, "error_type": "contract", "error_query": contract_code, "company_name": name}
 
+    try:
         key_s = (contract_id, service_description)
         if key_s not in cache["services"]:
-            cache["services"][key_s] = tustena_get_service_id(contract_id, service_description, api_key)
+            cache["services"][key_s] = tustena_get_service_id(contract_id, service_description, api_key, overrides=service_mapping)
         service_id = cache["services"][key_s]
-
-        return {**task, "company_id": company_id, "contract_id": contract_id, "service_id": service_id}
     except Exception as e:
-        logger.error("Error enriching task %s: %s", task.get("project_name"), e)
         msg, _ = _friendly_error(e)
-        return {**task, "error": msg}
+        return {**task, "error": msg, "error_type": "service", "error_query": service_description, "company_name": name, "contract_code": contract_code}
+
+    return {**task, "company_id": company_id, "contract_id": contract_id, "service_id": service_id}
 
 
-def _enrich_and_check(tasks: list, api_key: str, tustena_user_id: str) -> list:
+def _enrich_and_check(tasks: list, api_key: str, tustena_user_id: str, company_mapping: dict = None, service_mapping: dict = None) -> list:
     """Resolve Tustena IDs and flag duplicate vouchers."""
     cache    = {"companies": {}, "contracts": {}, "services": {}}
-    resolved = [_resolve_tustena_ids(task, api_key, cache) for task in tasks]
+    resolved = [_resolve_tustena_ids(task, api_key, cache, company_mapping, service_mapping) for task in tasks]
     ok_tasks = [task for task in resolved if "error" not in task]
 
     # Build per-company date ranges
@@ -173,11 +181,13 @@ def preview():
         float_api_key   = data["float_api_key"]
         start           = data.get("date") or data.get("date_from")
         end             = data.get("date") or data.get("date_to")
+        cm              = json.loads(data.get("company_mapping") or "{}")
+        sm              = json.loads(data.get("service_mapping") or "{}")
 
         tustena_user_id, person_name = _get_tustena_context(tustena_api_key)
         float_people_id = float_get_person_id(person_name, float_api_key)
         tasks    = float_get_allocations(float_people_id, start, end, float_api_key)
-        enriched = _enrich_and_check(tasks, tustena_api_key, tustena_user_id)
+        enriched = _enrich_and_check(tasks, tustena_api_key, tustena_user_id, cm, sm)
         return jsonify({"allocations": enriched})
     except Exception as e:
         logger.exception("Unhandled error in /preview")
@@ -220,7 +230,11 @@ def preview_csv():
                        request.form.get("date", "").strip(),
                        request.form.get("date_from", "").strip(),
                        request.form.get("date_to", "").strip())
-        enriched = _enrich_and_check(tasks, tustena_api_key, tustena_user_id)
+                       
+        cm = json.loads(request.form.get("company_mapping") or "{}")
+        sm = json.loads(request.form.get("service_mapping") or "{}")
+        
+        enriched = _enrich_and_check(tasks, tustena_api_key, tustena_user_id, cm, sm)
         return jsonify({"allocations": enriched})
     except Exception as e:
         logger.exception("Unhandled error in /preview_csv")
@@ -254,7 +268,10 @@ def preview_ical():
             return jsonify({"error": "Nessuna allocazione trovata nel feed iCal per il periodo selezionato."}), 400
 
         tustena_user_id, _ = _get_tustena_context(tustena_api_key)
-        enriched = _enrich_and_check(tasks, tustena_api_key, tustena_user_id)
+        cm = json.loads(data.get("company_mapping") or "{}")
+        sm = json.loads(data.get("service_mapping") or "{}")
+        
+        enriched = _enrich_and_check(tasks, tustena_api_key, tustena_user_id, cm, sm)
         return jsonify({"allocations": enriched})
     except Exception as e:
         logger.exception("Unhandled error in /preview_ical")

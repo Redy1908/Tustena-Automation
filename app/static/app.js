@@ -16,13 +16,11 @@ const mainView     = document.getElementById('main-view');
 function showSettings() {
   mainView.style.display     = 'none';
   settingsView.style.display = 'block';
-  document.getElementById('warning-banner-full').style.display = 'none';
 }
 
 function showMainView() {
   settingsView.style.display = 'none';
   mainView.style.display     = 'block';
-  document.getElementById('warning-banner-full').style.display = '';
   document.getElementById('holiday-warning').style.display = 
     (!document.getElementById('skip_holidays').checked) ? '' : 'none';
   loadWeek();
@@ -35,11 +33,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const local_ical    = localStorage.getItem('ical_url');
   const local_float   = localStorage.getItem('float_api_key');
   const skip_holidays = localStorage.getItem('skip_holidays');
+  const local_cm      = localStorage.getItem('company_mapping');
+  const local_sm      = localStorage.getItem('service_mapping');
   
   if (local_tustena) document.getElementById('tustena_api_key').value = local_tustena;
   if (local_ical)    document.getElementById('ical_url').value = local_ical;
   if (local_float)   document.getElementById('float_api_key').value = local_float;
   if (skip_holidays) document.getElementById('skip_holidays').checked = skip_holidays === 'true';
+  if (local_cm)      document.getElementById('company_mapping').value = local_cm;
+  if (local_sm)      document.getElementById('service_mapping').value = local_sm;
 
   const tk = document.getElementById('tustena_api_key').value.trim();
   const ic = document.getElementById('ical_url').value.trim();
@@ -210,6 +212,9 @@ async function fetchPreview(mode, bounds) {
 
   let fetchUrl, fetchInit;
 
+  const cm = document.getElementById('company_mapping')?.value.trim() || '{}';
+  const sm = document.getElementById('service_mapping')?.value.trim() || '{}';
+
   if (mode === 'csv') {
     if (!csvFile) return setListError('Seleziona prima il file CSV nelle Impostazioni.');
     const fd = new FormData();
@@ -217,6 +222,8 @@ async function fetchPreview(mode, bounds) {
     fd.append('csv_file', csvFile);
     fd.append('date_from', bounds.start);
     fd.append('date_to', bounds.end);
+    fd.append('company_mapping', cm);
+    fd.append('service_mapping', sm);
     fetchUrl  = '/preview_csv';
     fetchInit = { method: 'POST', body: fd };
   } else if (mode === 'ical') {
@@ -225,7 +232,7 @@ async function fetchPreview(mode, bounds) {
     fetchInit = { 
       method: 'POST', 
       headers: { 'Content-Type': 'application/json' }, 
-      body: JSON.stringify({ tustena_api_key: tk, ical_url: ic, skip_holidays: skip, date_from: bounds.start, date_to: bounds.end }) 
+      body: JSON.stringify({ tustena_api_key: tk, ical_url: ic, skip_holidays: skip, date_from: bounds.start, date_to: bounds.end, company_mapping: cm, service_mapping: sm }) 
     };
   } else if (mode === 'float') {
     if (!fk) return setListError('API Key Float mancante nelle impostazioni.');
@@ -233,7 +240,7 @@ async function fetchPreview(mode, bounds) {
     fetchInit = { 
       method: 'POST', 
       headers: { 'Content-Type': 'application/json' }, 
-      body: JSON.stringify({ tustena_api_key: tk, float_api_key: fk, date_from: bounds.start, date_to: bounds.end }) 
+      body: JSON.stringify({ tustena_api_key: tk, float_api_key: fk, date_from: bounds.start, date_to: bounds.end, company_mapping: cm, service_mapping: sm }) 
     };
   }
 
@@ -257,9 +264,18 @@ async function fetchPreview(mode, bounds) {
 document.getElementById('settings-form').addEventListener('submit', async e => {
   e.preventDefault();
   const tustenaEl = document.getElementById('tustena_api_key');
-  
-  if (!tustenaEl.value.trim()) { 
-    tustenaEl.classList.add('input-error'); 
+  const companyEl = document.getElementById('company_mapping');
+  const serviceEl = document.getElementById('service_mapping');
+  let valid = true;
+
+  try { if (companyEl.value.trim()) JSON.parse(companyEl.value.trim()); companyEl.classList.remove('input-error'); } 
+  catch(err) { companyEl.classList.add('input-error'); valid = false; }
+
+  try { if (serviceEl.value.trim()) JSON.parse(serviceEl.value.trim()); serviceEl.classList.remove('input-error'); } 
+  catch(err) { serviceEl.classList.add('input-error'); valid = false; }
+
+  if (!tustenaEl.value.trim() || !valid) { 
+    if(!tustenaEl.value.trim()) tustenaEl.classList.add('input-error'); 
     return; 
   }
   
@@ -267,6 +283,8 @@ document.getElementById('settings-form').addEventListener('submit', async e => {
   localStorage.setItem('ical_url', document.getElementById('ical_url').value.trim());
   localStorage.setItem('float_api_key', document.getElementById('float_api_key').value.trim());
   localStorage.setItem('skip_holidays', document.getElementById('skip_holidays').checked);
+  localStorage.setItem('company_mapping', companyEl.value.trim());
+  localStorage.setItem('service_mapping', serviceEl.value.trim());
   
   showMainView();
 });
@@ -312,12 +330,27 @@ function renderPreview(allocations) {
 
       if (t.error) {
         row.className = 'voucher-row voucher-error';
+        let errorAction = `<div class="voucher-error-msg">${t.error}</div>`;
+        
+        if (t.error_type === 'company' || t.error_type === 'service') {
+           errorAction = `
+             <div class="voucher-error-action" data-type="${t.error_type}" data-query="${t.error_query ? t.error_query.replace(/"/g, '&quot;') : ''}" data-company="${t.company_name ? t.company_name.replace(/"/g, '&quot;') : ''}" data-contract="${t.contract_code ? t.contract_code.replace(/"/g, '&quot;') : ''}">
+               <div class="voucher-error-msg" style="margin-bottom:0.4rem;">${t.error} - <b>Mappa manuale:</b></div>
+               <div class="company-search-row">
+                 <input type="text" class="inline-search-input" placeholder="Cerca su Tustena..." value="${t.error_query ? t.error_query.replace(/"/g, '&quot;') : ''}" />
+                 <button type="button" class="btn-inline-search">Cerca</button>
+               </div>
+               <ul class="inline-search-results search-results" style="display:none"></ul>
+             </div>
+           `;
+        }
+
         row.innerHTML = `
-          <div class="voucher-meta">
+          <div class="voucher-meta" style="flex:unset; width:100%; margin-bottom:0.5rem">
             <div class="vm-primary" title="${t.project_name}">${t.project_name}</div>
             <div class="vm-secondary" title="${t.client_name}">${t.client_name}</div>
           </div>
-          <div class="voucher-error-msg">${t.error}</div>`;
+          ${errorAction}`;
       } else if (t.exists) {
         row.className = 'voucher-row voucher-exists';
         row.innerHTML = `
@@ -475,12 +508,15 @@ document.getElementById('voucher-list').addEventListener('click', async (e) => {
     end_time: endEl.value,
     description: desc
   };
+
+  const cm = document.getElementById('company_mapping')?.value.trim() || '{}';
+  const sm = document.getElementById('service_mapping')?.value.trim() || '{}';
   
   try {
     const resp = await fetch('/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tustena_api_key: tk, float_api_key: fk, tasks: [singleTask] })
+      body: JSON.stringify({ tustena_api_key: tk, float_api_key: fk, tasks: [singleTask], company_mapping: cm, service_mapping: sm })
     });
     
     const text = await resp.text();
@@ -508,69 +544,88 @@ document.getElementById('voucher-list').addEventListener('click', async (e) => {
   }
 });
 
-/* ── Modals and Search (copied from previous structure) ───────────────────── */
+/* ── Inline Mapping Resolution ────────────────────────────────────────────── */
 
-document.getElementById('warning-toggle')?.addEventListener('click', () => {
-  const details = document.getElementById('warning-details');
-  const chevron = document.querySelector('.warning-chevron');
-  const expanded = details.style.display !== 'none';
-  details.style.display = expanded ? 'none' : '';
-  chevron.classList.toggle('warning-chevron--open', !expanded);
+document.getElementById('voucher-list').addEventListener('click', async e => {
+  const btn = e.target.closest('.btn-inline-search');
+  if (btn) {
+    const actionEl = btn.closest('.voucher-error-action');
+    const inputEl  = actionEl.querySelector('.inline-search-input');
+    const results  = actionEl.querySelector('.inline-search-results');
+    const type     = actionEl.dataset.type;
+    const query    = inputEl.value.trim();
+    const tustenaKey = document.getElementById('tustena_api_key').value.trim();
+
+    if (!query) return;
+
+    results.innerHTML = '<li class="company-search-loading">Ricerca in corso…</li>';
+    results.style.display = 'flex';
+
+    try {
+      let resp, json;
+      if (type === 'company') {
+        resp = await fetch(`/search_company?tustena_api_key=${encodeURIComponent(tustenaKey)}&q=${encodeURIComponent(query)}`);
+      } else {
+        const company  = actionEl.dataset.company;
+        const contract = actionEl.dataset.contract;
+        resp = await fetch(`/search_services?tustena_api_key=${encodeURIComponent(tustenaKey)}&company=${encodeURIComponent(company)}&contract=${encodeURIComponent(contract)}`);
+      }
+      json = await resp.json();
+
+      if (json.error) {
+        results.innerHTML = `<li class="company-search-error">${json.error}</li>`;
+      } else if (type === 'company' && !json.companies.length) {
+        results.innerHTML = '<li class="company-search-empty">Nessun risultato.</li>';
+      } else if (type === 'service' && !json.services.length) {
+        results.innerHTML = '<li class="company-search-empty">Nessun risultato.</li>';
+      } else {
+        const list = type === 'company' ? json.companies : json.services;
+        results.innerHTML = list.map(name => `<li class="inline-result-item" style="cursor:pointer">${name}</li>`).join('');
+      }
+    } catch {
+      results.innerHTML = '<li class="company-search-error">Errore di rete.</li>';
+    }
+    return;
+  }
+
+  const li = e.target.closest('.inline-result-item');
+  if (li) {
+    const actionEl = li.closest('.voucher-error-action');
+    const type     = actionEl.dataset.type;
+    const errorQ   = actionEl.dataset.query;
+    const selected = li.textContent.trim();
+    
+    const storageKey = type === 'company' ? 'company_mapping' : 'service_mapping';
+    const fieldId    = type === 'company' ? 'company_mapping' : 'service_mapping';
+    
+    let map = {};
+    try { 
+      const raw = localStorage.getItem(storageKey);
+      if (raw) map = JSON.parse(raw);
+    } catch(err) {}
+
+    map[errorQ] = selected;
+    const newJson = JSON.stringify(map, null, 2);
+    
+    localStorage.setItem(storageKey, newJson);
+    const field = document.getElementById(fieldId);
+    if (field) field.value = newJson;
+
+    if (document.getElementById('legacy-preview-wrapper').style.display !== 'none') {
+      document.getElementById('legacy-preview-btn').click();
+    } else {
+      loadWeek();
+    }
+  }
 });
 
-async function searchCompany() {
-  const query      = document.getElementById('company-search-input').value.trim();
-  const tustenaKey = document.getElementById('tustena_api_key').value.trim();
-  const results    = document.getElementById('company-search-results');
-  if (!query) return;
-
-  results.innerHTML = '<li class="company-search-loading">Ricerca in corso…</li>';
-  try {
-    const resp = await fetch(`/search_company?tustena_api_key=${encodeURIComponent(tustenaKey)}&q=${encodeURIComponent(query)}`);
-    const json = await resp.json();
-    if (json.error) {
-      results.innerHTML = `<li class="company-search-error">${json.error}</li>`;
-    } else if (!json.companies.length) {
-      results.innerHTML = '<li class="company-search-empty">Nessun risultato.</li>';
-    } else {
-      results.innerHTML = json.companies.map(name => `<li>${name}</li>`).join('');
-    }
-  } catch {
-    results.innerHTML = '<li class="company-search-error">Errore di rete.</li>';
+document.getElementById('voucher-list').addEventListener('keydown', e => {
+  if (e.target.classList.contains('inline-search-input') && e.key === 'Enter') {
+    e.preventDefault();
+    const btn = e.target.closest('.voucher-error-action').querySelector('.btn-inline-search');
+    if (btn) btn.click();
   }
-}
-
-document.getElementById('company-search-btn')?.addEventListener('click', searchCompany);
-document.getElementById('company-search-input')?.addEventListener('keydown', e => {
-  if (e.key === 'Enter') searchCompany();
 });
-
-async function searchServices() {
-  const company    = document.getElementById('service-company-input').value.trim();
-  const contract   = document.getElementById('service-contract-input').value.trim();
-  const tustenaKey = document.getElementById('tustena_api_key').value.trim();
-  const results    = document.getElementById('service-search-results');
-  if (!company || !contract) return;
-
-  results.innerHTML = '<li class="company-search-loading">Ricerca in corso…</li>';
-  try {
-    const resp = await fetch(`/search_services?tustena_api_key=${encodeURIComponent(tustenaKey)}&company=${encodeURIComponent(company)}&contract=${encodeURIComponent(contract)}`);
-    const json = await resp.json();
-    if (json.error) {
-      results.innerHTML = `<li class="company-search-error">${json.error}</li>`;
-    } else if (!json.services.length) {
-      results.innerHTML = '<li class="company-search-empty">Nessun risultato.</li>';
-    } else {
-      results.innerHTML = json.services.map(name => `<li>${name}</li>`).join('');
-    }
-  } catch {
-    results.innerHTML = '<li class="company-search-error">Errore di rete.</li>';
-  }
-}
-
-document.getElementById('service-search-btn')?.addEventListener('click', searchServices);
-const svcInputs = [document.getElementById('service-company-input'), document.getElementById('service-contract-input')];
-svcInputs.forEach(el => el?.addEventListener('keydown', e => { if (e.key === 'Enter') searchServices(); }));
 
 const helpModal = document.getElementById('help-modal');
 const helpBtn = document.getElementById('help-btn');

@@ -70,8 +70,11 @@ def tustena_search_companies(query: str, api_key: str) -> list[str]:
     return [c["companyName"] for c in (companies or [])]
 
 
-def tustena_get_company_id(company_name: str, api_key: str):
-    company_name = _COMPANY_MAPPING.get(company_name, company_name)
+def tustena_get_company_id(company_name: str, api_key: str, overrides: dict = None):
+    mapping = _COMPANY_MAPPING.copy()
+    if overrides:
+        mapping.update(overrides)
+    company_name = mapping.get(company_name, company_name)
     companies = _post("Company/SearchByODataCriteria", api_key,
                       json={"filter": f"substringof('{company_name}',companyName)", "select": "id,companyName"})
     if len(companies) == 1:
@@ -93,8 +96,11 @@ def tustena_get_contract_id(company_id: str, contract_code: str, api_key: str):
     raise ValueError(f"Nessun match trovato per '{contract_code}'")
 
 
-def tustena_get_service_id(contract_id: str, service_description: str, api_key: str):
-    service_description = _SERVICE_MAPPING.get(service_description, service_description)
+def tustena_get_service_id(contract_id: str, service_description: str, api_key: str, overrides: dict = None):
+    mapping = _SERVICE_MAPPING.copy()
+    if overrides:
+        mapping.update(overrides)
+    service_description = mapping.get(service_description, service_description)
     all_services = _get(f"Contract/{contract_id}/Services", api_key)
     services = [s for s in all_services
                 if s["catalogDescription"].lower() == service_description.lower()]

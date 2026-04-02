@@ -125,7 +125,8 @@ input[type="password"],
 input[type="text"],
 input[type="url"],
 input[type="date"],
-input[type="time"] {
+input[type="time"],
+textarea {
   width: 100%;
   background: var(--input-bg);
   border: 1px solid var(--input-border);
@@ -138,12 +139,16 @@ input[type="time"] {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
+textarea {
+  resize: vertical;
+}
 
 input[type="password"]:focus,
 input[type="text"]:focus,
-input[type="url"],
+input[type="url"]:focus,
 input[type="date"]:focus,
-input[type="time"]:focus {
+input[type="time"]:focus,
+textarea:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
 }

@@ -53,6 +53,28 @@
       </label>
     </div>
 
+    <div class="field">
+      <label>
+        Company Mapping (JSON)
+        <span class="info-icon" tabindex="0" aria-label="Esempio mapping">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span class="tooltip">Esempio: {"Float Name": "Tustena Name"}</span>
+        </span>
+      </label>
+      <textarea id="company_mapping" name="company_mapping" rows="2" placeholder='{"Nome Float": "Nome Tustena"}'></textarea>
+    </div>
+
+    <div class="field">
+      <label>
+        Service Mapping (JSON)
+        <span class="info-icon" tabindex="0" aria-label="Esempio mapping">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span class="tooltip">Esempio: {"Float Service": "Tustena Service"}</span>
+        </span>
+      </label>
+      <textarea id="service_mapping" name="service_mapping" rows="2" placeholder='{"Servizio Float": "Servizio Tustena"}'></textarea>
+    </div>
+
     <!-- Legacy / Advanced options -->
     <div class="field-checkbox" style="margin-top: 1.5rem">
       <label class="checkbox-label" style="font-weight: 500;">
@@ -101,36 +123,6 @@
   <div class="contact-box" style="margin-top: 1.5rem;">
     <span>Problemi o suggerimenti?</span>
     <a href="https://github.com/Redy1908/Tustena-Automation" target="_blank" rel="noopener">GitHub</a>
-  </div>
-</div>
-
-<!-- WARNING FULL -->
-<div class="warning-banner" id="warning-banner-full" style="display:none;">
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-  <div class="warning-body">
-    <div class="warning-summary" id="warning-toggle">
-      <span>Alcune allocazioni possono fallire per mismatch nomi. Clicca per mappare i nomi.</span>
-      <span class="warning-expand-hint">Apri Mappings <svg class="warning-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
-    </div>
-    <div class="warning-details" id="warning-details" style="display:none">
-      <span>Alcune allocazioni possono fallire per un mismatch tra il nome dell'azienda su Float e il corrispondente su Tustena. Per risolvere, cerca il nome esatto su Tustena tramite il campo qui sotto e aggiungilo nel file <code>mappings/company_mapping.json</code>.</span>
-      <div class="company-search">
-        <div class="company-search-row">
-          <input type="text" id="company-search-input" placeholder="Cerca azienda su Tustena…" />
-          <button type="button" id="company-search-btn">Cerca</button>
-        </div>
-        <ul id="company-search-results" class="search-results"></ul>
-      </div>
-      <span>Lo stesso vale per i servizi: cerca i servizi disponibili per un contratto e aggiorna <code>mappings/service_mapping.json</code>.</span>
-      <div class="company-search">
-        <div class="company-search-row">
-          <input type="text" id="service-company-input" placeholder="Azienda…" />
-          <input type="text" id="service-contract-input" placeholder="Codice contratto…" />
-          <button type="button" id="service-search-btn">Cerca</button>
-        </div>
-        <ul id="service-search-results" class="search-results"></ul>
-      </div>
-    </div>
   </div>
 </div>
 
