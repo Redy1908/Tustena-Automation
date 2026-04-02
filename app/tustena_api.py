@@ -1,22 +1,7 @@
-import json
-import os
 import requests
 
 _TUSTENA_BASE_URL = "https://kiratechapp.cloud.teamsystem.com:444/api/v1"
 _session = requests.Session()
-
-_COMPANY_MAPPING_PATH = os.path.join(os.path.dirname(__file__), "..", "mappings", "company_mapping.json")
-_SERVICE_MAPPING_PATH = os.path.join(os.path.dirname(__file__), "..", "mappings", "service_mapping.json")
-
-def _load_mapping(path: str) -> dict:
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
-
-_COMPANY_MAPPING = _load_mapping(_COMPANY_MAPPING_PATH)
-_SERVICE_MAPPING = _load_mapping(_SERVICE_MAPPING_PATH)
 
 _VOUCHER_DEFAULTS = {
     "type": 6,
@@ -57,8 +42,8 @@ def tustena_get_current_user_fullname(api_key: str) -> str:
     return f"{u['name']} {u['surname']}".strip()
 
 
-def tustena_search_services(company_name: str, contract_code: str, api_key: str) -> list[str]:
-    company_id  = tustena_get_company_id(company_name, api_key)
+def tustena_search_services(company_name: str, contract_code: str, api_key: str, company_overrides: dict = None) -> list[str]:
+    company_id  = tustena_get_company_id(company_name, api_key, overrides=company_overrides)
     contract_id = tustena_get_contract_id(company_id, contract_code, api_key)
     services    = _get(f"Contract/{contract_id}/Services", api_key)
     return [s["catalogDescription"] for s in (services or [])]
@@ -71,9 +56,7 @@ def tustena_search_companies(query: str, api_key: str) -> list[str]:
 
 
 def tustena_get_company_id(company_name: str, api_key: str, overrides: dict = None):
-    mapping = _COMPANY_MAPPING.copy()
-    if overrides:
-        mapping.update(overrides)
+    mapping = overrides or {}
     company_name = mapping.get(company_name, company_name)
     companies = _post("Company/SearchByODataCriteria", api_key,
                       json={"filter": f"substringof('{company_name}',companyName)", "select": "id,companyName"})
@@ -97,9 +80,7 @@ def tustena_get_contract_id(company_id: str, contract_code: str, api_key: str):
 
 
 def tustena_get_service_id(contract_id: str, service_description: str, api_key: str, overrides: dict = None):
-    mapping = _SERVICE_MAPPING.copy()
-    if overrides:
-        mapping.update(overrides)
+    mapping = overrides or {}
     service_description = mapping.get(service_description, service_description)
     all_services = _get(f"Contract/{contract_id}/Services", api_key)
     services = [s for s in all_services

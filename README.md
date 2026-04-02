@@ -77,12 +77,7 @@ Usa il feed iCal personale di Float per recuperare le allocazioni, senza richied
 
 ## Risoluzione mismatch nomi
 
-Se nell'anteprima compaiono voucher **con errore**, significa che il nome azienda o servizio su Float non corrisponde esattamente a quello su Tustena. Usa la ricerca integrata nel banner dell'app per trovare il nome corretto, poi aggiorna i file nella cartella `mappings/`:
-
-| File | Scopo |
-|------|-------|
-| `mappings/company_mapping.json` | Mappa i nomi azienda Float → Tustena |
-| `mappings/service_mapping.json` | Mappa i nomi servizio Float → Tustena |
+Alcuni iovoucher potrebbero andare in errore questo accade perchè il nome azienda o servizio su Float non corrisponde a quello su Tustena. Usa la ricerca inline direttamente nel voucher per trovare il nome corretto e mapparlo: il mapping viene salvato automaticamente nelle Impostazioni e riapplicato alle sessioni successive.
 
 ## Note tecniche
 

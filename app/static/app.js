@@ -29,23 +29,36 @@ function showMainView() {
 document.getElementById('view-settings-btn').addEventListener('click', showSettings);
 
 document.addEventListener('DOMContentLoaded', () => {
+  ['company_mapping', 'service_mapping'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('blur', () => {
+      const pretty = _prettyJson(el.value);
+      if (pretty !== el.value) el.value = pretty;
+      _validateJsonField(el);
+    });
+    el.addEventListener('input', () => {
+      if (el.classList.contains('input-error')) _validateJsonField(el);
+    });
+  });
+
   const local_tustena = localStorage.getItem('tustena_api_key');
   const local_ical    = localStorage.getItem('ical_url');
   const local_float   = localStorage.getItem('float_api_key');
   const skip_holidays = localStorage.getItem('skip_holidays');
   const local_cm      = localStorage.getItem('company_mapping');
   const local_sm      = localStorage.getItem('service_mapping');
-  
+
   if (local_tustena) document.getElementById('tustena_api_key').value = local_tustena;
   if (local_ical)    document.getElementById('ical_url').value = local_ical;
   if (local_float)   document.getElementById('float_api_key').value = local_float;
   if (skip_holidays) document.getElementById('skip_holidays').checked = skip_holidays === 'true';
-  if (local_cm)      document.getElementById('company_mapping').value = local_cm;
-  if (local_sm)      document.getElementById('service_mapping').value = local_sm;
+  if (local_cm) document.getElementById('company_mapping').value = _prettyJson(local_cm);
+  if (local_sm) document.getElementById('service_mapping').value = _prettyJson(local_sm);
 
   const tk = document.getElementById('tustena_api_key').value.trim();
   const ic = document.getElementById('ical_url').value.trim();
-  
+
   if (tk && ic) {
     showMainView();
   } else {
@@ -92,6 +105,10 @@ function getWeekBoundaries(offset) {
 
 document.getElementById('advanced_toggle').addEventListener('change', function() {
   document.getElementById('advanced-container').style.display = this.checked ? 'block' : 'none';
+});
+
+document.getElementById('mapping-toggle').addEventListener('change', function() {
+  document.getElementById('mapping-fields').style.display = this.checked ? 'block' : 'none';
 });
 
 document.querySelectorAll('.mode-chip').forEach(chip => {
@@ -259,6 +276,35 @@ async function fetchPreview(mode, bounds) {
   }
 }
 
+/* ── JSON Mapping Fields ─────────────────────────────────────────────────── */
+
+function _prettyJson(raw) {
+  if (!raw || !raw.trim()) return '';
+  try { return JSON.stringify(JSON.parse(raw), null, 2); } catch(e) { return raw; }
+}
+
+function _validateJsonField(el) {
+  const errId = { company_mapping: 'err-company-mapping', service_mapping: 'err-service-mapping' }[el.id];
+  const errEl = errId ? document.getElementById(errId) : null;
+  const val   = el.value.trim();
+  if (!val) {
+    el.classList.remove('input-error');
+    if (errEl) errEl.classList.remove('visible');
+    return true;
+  }
+  try {
+    JSON.parse(val);
+    el.classList.remove('input-error');
+    if (errEl) errEl.classList.remove('visible');
+    return true;
+  } catch(e) {
+    el.classList.add('input-error');
+    if (errEl) errEl.classList.add('visible');
+    return false;
+  }
+}
+
+
 /* ── Save Settings ────────────────────────────────────────────────────────── */
 
 document.getElementById('settings-form').addEventListener('submit', async e => {
@@ -268,16 +314,32 @@ document.getElementById('settings-form').addEventListener('submit', async e => {
   const serviceEl = document.getElementById('service_mapping');
   let valid = true;
 
-  try { if (companyEl.value.trim()) JSON.parse(companyEl.value.trim()); companyEl.classList.remove('input-error'); } 
-  catch(err) { companyEl.classList.add('input-error'); valid = false; }
+  if (!_validateJsonField(companyEl)) valid = false;
+  if (!_validateJsonField(serviceEl)) valid = false;
 
-  try { if (serviceEl.value.trim()) JSON.parse(serviceEl.value.trim()); serviceEl.classList.remove('input-error'); } 
-  catch(err) { serviceEl.classList.add('input-error'); valid = false; }
+  const icalEl   = document.getElementById('ical_url');
+  const errTustena = document.getElementById('err-tustena-api-key');
+  const errIcal    = document.getElementById('err-ical-url');
 
-  if (!tustenaEl.value.trim() || !valid) { 
-    if(!tustenaEl.value.trim()) tustenaEl.classList.add('input-error'); 
-    return; 
+  if (!tustenaEl.value.trim()) {
+    tustenaEl.classList.add('input-error');
+    if (errTustena) errTustena.classList.add('visible');
+    valid = false;
+  } else {
+    tustenaEl.classList.remove('input-error');
+    if (errTustena) errTustena.classList.remove('visible');
   }
+
+  if (!icalEl.value.trim()) {
+    icalEl.classList.add('input-error');
+    if (errIcal) errIcal.classList.add('visible');
+    valid = false;
+  } else {
+    icalEl.classList.remove('input-error');
+    if (errIcal) errIcal.classList.remove('visible');
+  }
+
+  if (!valid) return;
   
   localStorage.setItem('tustena_api_key', tustenaEl.value.trim());
   localStorage.setItem('ical_url', document.getElementById('ical_url').value.trim());
@@ -285,7 +347,7 @@ document.getElementById('settings-form').addEventListener('submit', async e => {
   localStorage.setItem('skip_holidays', document.getElementById('skip_holidays').checked);
   localStorage.setItem('company_mapping', companyEl.value.trim());
   localStorage.setItem('service_mapping', serviceEl.value.trim());
-  
+
   showMainView();
 });
 
@@ -332,17 +394,53 @@ function renderPreview(allocations) {
         row.className = 'voucher-row voucher-error';
         let errorAction = `<div class="voucher-error-msg">${t.error}</div>`;
         
-        if (t.error_type === 'company' || t.error_type === 'service') {
-           errorAction = `
-             <div class="voucher-error-action" data-type="${t.error_type}" data-query="${t.error_query ? t.error_query.replace(/"/g, '&quot;') : ''}" data-company="${t.company_name ? t.company_name.replace(/"/g, '&quot;') : ''}" data-contract="${t.contract_code ? t.contract_code.replace(/"/g, '&quot;') : ''}">
-               <div class="voucher-error-msg" style="margin-bottom:0.4rem;">${t.error} - <b>Mappa manuale:</b></div>
-               <div class="company-search-row">
-                 <input type="text" class="inline-search-input" placeholder="Cerca su Tustena..." value="${t.error_query ? t.error_query.replace(/"/g, '&quot;') : ''}" />
-                 <button type="button" class="btn-inline-search">Cerca</button>
-               </div>
-               <ul class="inline-search-results search-results" style="display:none"></ul>
-             </div>
-           `;
+        if (t.error_type === 'company') {
+          const q = t.error_query ? t.error_query.replace(/"/g, '&quot;') : '';
+          errorAction = `
+            <div class="voucher-error-action" data-type="company" data-query="${q}">
+              <div class="mi-hint">Il nome su Float non corrisponde a nessun cliente su Tustena. Cerca il nome corretto:</div>
+              <div class="mi-row">
+                <span class="mi-name" title="${q}">${q}</span>
+                <span class="mi-arrow">→</span>
+                <div class="mi-search-wrap">
+                  <div class="mi-input-row">
+                    <input type="text" class="inline-search-input mi-input" placeholder="Cerca su Tustena…" value="${q}" />
+                    <button type="button" class="btn-inline-search mi-btn">Cerca</button>
+                  </div>
+                  <div class="mi-results-container" style="display:none">
+                    <ul class="inline-search-results mi-results"></ul>
+                    <div class="mi-mappa-row">
+                      <button type="button" class="btn-mappa-confirm mi-mappa-btn" disabled>Mappa</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        } else if (t.error_type === 'service') {
+          const q = t.error_query ? t.error_query.replace(/"/g, '&quot;') : '';
+          const co = t.company_name ? t.company_name.replace(/"/g, '&quot;') : '';
+          const ct = t.contract_code ? t.contract_code.replace(/"/g, '&quot;') : '';
+          errorAction = `
+            <div class="voucher-error-action" data-type="service" data-query="${q}" data-company="${co}" data-contract="${ct}">
+              <div class="mi-hint">Il servizio su Float non corrisponde a nessun servizio Tustena del contratto <strong>${ct}</strong>. Seleziona il servizio corretto:</div>
+              <div class="mi-row">
+                <span class="mi-name" title="${q}">${q}</span>
+                <span class="mi-arrow">→</span>
+                <div class="mi-search-wrap">
+                  <div class="mi-input-row">
+                    <button type="button" class="btn-inline-search mi-btn">Carica servizi</button>
+                  </div>
+                  <div class="mi-results-container" style="display:none">
+                    <ul class="inline-search-results mi-results"></ul>
+                    <div class="mi-mappa-row">
+                      <button type="button" class="btn-mappa-confirm mi-mappa-btn" disabled>Mappa</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
         }
 
         row.innerHTML = `
@@ -387,9 +485,10 @@ function renderPreview(allocations) {
           </div>
           <textarea class="voucher-description" placeholder="Contenuto Del Rapportino…" rows="1">${t.notes || ''}</textarea>`;
         
-        row.querySelectorAll('input[type="time"]').forEach(inp =>
-          inp.addEventListener('input', () => { updateDuration(row, t.hours); })
-        );
+        row.querySelectorAll('input[type="time"]').forEach(inp => {
+          inp.addEventListener('input',  () => { updateDuration(row, t.hours); });
+          inp.addEventListener('change', () => { updateDuration(row, t.hours); });
+        });
         updateDuration(row, t.hours);
       }
       list.appendChild(row);
@@ -401,7 +500,7 @@ function renderPreview(allocations) {
   const toggleBtn = document.getElementById('toggle-exists-btn');
   toggleBtn.style.display = existsCount > 0 ? '' : 'none';
   toggleBtn.dataset.hidden = 'true';
-  toggleBtn.textContent = 'Mostra già presenti';
+  toggleBtn.textContent = `Mostra ${existsCount} già present${existsCount === 1 ? 'e' : 'i'}`;
 
   document.querySelectorAll('.voucher-exists').forEach(r => r.style.display = 'none');
   updateDateSeparators();
@@ -427,7 +526,8 @@ document.getElementById('toggle-exists-btn').addEventListener('click', () => {
   });
   updateDateSeparators();
   btn.dataset.hidden = hiding ? 'true' : 'false';
-  btn.textContent = hiding ? 'Mostra già presenti' : 'Nascondi già presenti';
+  const cnt = document.querySelectorAll('.voucher-exists').length;
+  btn.textContent = hiding ? `Mostra ${cnt} già present${cnt === 1 ? 'e' : 'i'}` : 'Nascondi già presenti';
 });
 
 
@@ -440,7 +540,7 @@ function updateDuration(row, expectedHours) {
   const startVal = startInput.value;
   const endVal   = endInput.value;
 
-  if (!startVal || !endVal) { durEl.textContent = '—'; if(btn) btn.disabled=true; return; }
+  if (!startVal || !endVal) { durEl.textContent = '—'; if(btn) { btn.disabled=true; btn.title='Inserisci orario di inizio e fine'; } return; }
 
   const [sh, sm] = startVal.split(':').map(Number);
   const [eh, em] = endVal.split(':').map(Number);
@@ -452,7 +552,7 @@ function updateDuration(row, expectedHours) {
     endInput.classList.add('input-error');
     durEl.textContent = 'Fine ≤ Inizio';
     durEl.className = 'voucher-duration voucher-hours--diff';
-    if(btn) btn.disabled=true;
+    if(btn) { btn.disabled=true; btn.title='Orario non valido: fine ≤ inizio'; }
     return;
   }
 
@@ -461,10 +561,16 @@ function updateDuration(row, expectedHours) {
 
   const actualH = (actualMins / 60).toFixed(1).replace('.0', '');
   durEl.textContent = `Durata: ${actualH}h`;
-  durEl.className = actualMins !== expectedMins ? 'voucher-duration voucher-hours--diff' : 'voucher-duration';
+  const hasDurationError = actualMins !== expectedMins;
+  durEl.className = hasDurationError ? 'voucher-duration voucher-hours--diff' : 'voucher-duration';
   if(btn) {
     const descEl = row.querySelector('.voucher-description');
-    btn.disabled = (!descEl || !descEl.value.trim());
+    const descEmpty = !descEl || !descEl.value.trim();
+    if (descEl) descEl.classList.toggle('input-error', descEmpty);
+    btn.disabled = hasDurationError || descEmpty;
+    if (hasDurationError)   btn.title = 'La durata non corrisponde a quella prevista da Float';
+    else if (descEmpty)     btn.title = 'Inserisci il contenuto del rapportino';
+    else                    btn.title = 'Crea voucher';
   }
 }
 
@@ -539,7 +645,6 @@ document.getElementById('voucher-list').addEventListener('click', async (e) => {
     btn.disabled = false;
     btn.textContent = 'Riprova';
     btn.style.background = 'var(--error)';
-    console.error(err);
     alert(`Errore: ${err.message}`);
   }
 });
@@ -549,41 +654,45 @@ document.getElementById('voucher-list').addEventListener('click', async (e) => {
 document.getElementById('voucher-list').addEventListener('click', async e => {
   const btn = e.target.closest('.btn-inline-search');
   if (btn) {
-    const actionEl = btn.closest('.voucher-error-action');
-    const inputEl  = actionEl.querySelector('.inline-search-input');
-    const results  = actionEl.querySelector('.inline-search-results');
-    const type     = actionEl.dataset.type;
-    const query    = inputEl.value.trim();
+    const actionEl   = btn.closest('.voucher-error-action');
+    const inputEl    = actionEl.querySelector('.inline-search-input');
+    const results    = actionEl.querySelector('.inline-search-results');
+    const container  = actionEl.querySelector('.mi-results-container');
+    const mappaBtn   = actionEl.querySelector('.btn-mappa-confirm');
+    const type       = actionEl.dataset.type;
+    const query      = inputEl ? inputEl.value.trim() : '';
     const tustenaKey = document.getElementById('tustena_api_key').value.trim();
 
-    if (!query) return;
+    if (type === 'company' && !query) return;
 
-    results.innerHTML = '<li class="company-search-loading">Ricerca in corso…</li>';
-    results.style.display = 'flex';
+    results.innerHTML = '<li class="company-search-loading" style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Ricerca in corso…</li>';
+    container.style.display = '';
+    if (mappaBtn) { mappaBtn.disabled = true; }
 
     try {
       let resp, json;
       if (type === 'company') {
         resp = await fetch(`/search_company?tustena_api_key=${encodeURIComponent(tustenaKey)}&q=${encodeURIComponent(query)}`);
       } else {
-        const company  = actionEl.dataset.company;
-        const contract = actionEl.dataset.contract;
-        resp = await fetch(`/search_services?tustena_api_key=${encodeURIComponent(tustenaKey)}&company=${encodeURIComponent(company)}&contract=${encodeURIComponent(contract)}`);
+        const company       = actionEl.dataset.company;
+        const contract      = actionEl.dataset.contract;
+        const companyMapping = localStorage.getItem('company_mapping') || '';
+        resp = await fetch(`/search_services?tustena_api_key=${encodeURIComponent(tustenaKey)}&company=${encodeURIComponent(company)}&contract=${encodeURIComponent(contract)}&company_mapping=${encodeURIComponent(companyMapping)}`);
       }
       json = await resp.json();
 
       if (json.error) {
-        results.innerHTML = `<li class="company-search-error">${json.error}</li>`;
+        results.innerHTML = `<li style="padding:0.35rem 0.6rem;color:var(--error);list-style:none;font-size:0.84rem">${json.error}</li>`;
       } else if (type === 'company' && !json.companies.length) {
-        results.innerHTML = '<li class="company-search-empty">Nessun risultato.</li>';
+        results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Nessun risultato.</li>';
       } else if (type === 'service' && !json.services.length) {
-        results.innerHTML = '<li class="company-search-empty">Nessun risultato.</li>';
+        results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Nessun risultato.</li>';
       } else {
         const list = type === 'company' ? json.companies : json.services;
-        results.innerHTML = list.map(name => `<li class="inline-result-item" style="cursor:pointer">${name}</li>`).join('');
+        results.innerHTML = list.map(name => `<li class="inline-result-item" data-name="${name.replace(/"/g,'&quot;')}">${name}</li>`).join('');
       }
     } catch {
-      results.innerHTML = '<li class="company-search-error">Errore di rete.</li>';
+      results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--error);list-style:none;font-size:0.84rem">Errore di rete.</li>';
     }
     return;
   }
@@ -591,22 +700,37 @@ document.getElementById('voucher-list').addEventListener('click', async e => {
   const li = e.target.closest('.inline-result-item');
   if (li) {
     const actionEl = li.closest('.voucher-error-action');
-    const type     = actionEl.dataset.type;
-    const errorQ   = actionEl.dataset.query;
-    const selected = li.textContent.trim();
-    
+    const results  = actionEl.querySelector('.inline-search-results');
+    const mappaBtn = actionEl.querySelector('.btn-mappa-confirm');
+
+    results.querySelectorAll('.inline-result-item').forEach(el => el.classList.remove('selected'));
+    li.classList.add('selected');
+    if (mappaBtn) mappaBtn.disabled = false;
+    return;
+  }
+
+  const mappaBtn = e.target.closest('.btn-mappa-confirm');
+  if (mappaBtn && !mappaBtn.disabled) {
+    const actionEl = mappaBtn.closest('.voucher-error-action');
+    const selected = actionEl.querySelector('.inline-result-item.selected');
+    if (!selected) return;
+
+    const type    = actionEl.dataset.type;
+    const errorQ  = actionEl.dataset.query;
+    const mapped  = selected.dataset.name;
+
     const storageKey = type === 'company' ? 'company_mapping' : 'service_mapping';
     const fieldId    = type === 'company' ? 'company_mapping' : 'service_mapping';
-    
+
     let map = {};
-    try { 
+    try {
       const raw = localStorage.getItem(storageKey);
       if (raw) map = JSON.parse(raw);
     } catch(err) {}
 
-    map[errorQ] = selected;
+    map[errorQ] = mapped;
     const newJson = JSON.stringify(map, null, 2);
-    
+
     localStorage.setItem(storageKey, newJson);
     const field = document.getElementById(fieldId);
     if (field) field.value = newJson;

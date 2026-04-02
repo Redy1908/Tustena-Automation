@@ -89,7 +89,8 @@ def float_get_allocations(float_people_id: int, start_date: str, end_date: str, 
         task["project_name"] = project["name"]
         task["client_name"]  = clients[project["client_id"]]["name"]
         for day in task.get("task_days", []):
-            expanded.append({**task, "start_date": day, "end_date": day})
+            hours = round(task.get("estimated_hours", 0) / max(len(task.get("task_days", [1])), 1), 2)
+            expanded.append({**task, "task_id": task["id"], "start_date": day, "end_date": day, "hours": hours})
     return expanded
 
 

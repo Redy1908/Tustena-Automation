@@ -155,7 +155,14 @@ def search_services():
             return jsonify({"error": "API key mancante"}), 400
         if not company_name or not contract_code:
             return jsonify({"services": []})
-        services = tustena_search_services(company_name, contract_code, tustena_api_key)
+        raw_cm = request.args.get("company_mapping", "")
+        company_overrides = {}
+        if raw_cm:
+            try:
+                company_overrides = json.loads(raw_cm)
+            except (ValueError, TypeError):
+                pass
+        services = tustena_search_services(company_name, contract_code, tustena_api_key, company_overrides=company_overrides)
         return jsonify({"services": services})
     except Exception as e:
         msg, status = _friendly_error(e)

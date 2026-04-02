@@ -41,7 +41,13 @@
     </div>
 
     <div class="field">
-      <label>Float iCal URL</label>
+      <label>
+        Float iCal URL
+        <span class="info-icon" tabindex="0" aria-label="Come recuperare l'URL iCal">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span class="tooltip">Personal → Calendar Integrations → Copy the link</span>
+        </span>
+      </label>
       <input type="url" id="ical_url" name="ical_url" placeholder="https://…/ical/…" value="{{ float_ical_url }}" />
       <span class="field-error-msg" id="err-ical-url">Inserisci l'URL iCal di Float.</span>
     </div>
@@ -53,26 +59,38 @@
       </label>
     </div>
 
-    <div class="field">
-      <label>
-        Company Mapping (JSON)
-        <span class="info-icon" tabindex="0" aria-label="Esempio mapping">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-          <span class="tooltip">Esempio: {"Float Name": "Tustena Name"}</span>
-        </span>
+    <div class="field-toggle-row">
+      <span class="field-toggle-label">Mapping nomi</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="mapping-toggle" />
+        <span class="toggle-track"><span class="toggle-thumb"></span></span>
       </label>
-      <textarea id="company_mapping" name="company_mapping" rows="2" placeholder='{"Nome Float": "Nome Tustena"}'></textarea>
     </div>
 
-    <div class="field">
-      <label>
-        Service Mapping (JSON)
-        <span class="info-icon" tabindex="0" aria-label="Esempio mapping">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-          <span class="tooltip">Esempio: {"Float Service": "Tustena Service"}</span>
-        </span>
-      </label>
-      <textarea id="service_mapping" name="service_mapping" rows="2" placeholder='{"Servizio Float": "Servizio Tustena"}'></textarea>
+    <div id="mapping-fields" style="display:none">
+      <div class="field">
+        <label>
+          Company Mapping (JSON)
+          <span class="info-icon" tabindex="0" aria-label="Esempio mapping">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span class="tooltip">Esempio: {"Float Name": "Tustena Name"}</span>
+          </span>
+        </label>
+        <textarea id="company_mapping" name="company_mapping" rows="3" placeholder='{"Nome Float": "Nome Tustena"}'></textarea>
+        <span class="field-error-msg" id="err-company-mapping">JSON non valido.</span>
+      </div>
+
+      <div class="field">
+        <label>
+          Service Mapping (JSON)
+          <span class="info-icon" tabindex="0" aria-label="Esempio mapping">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span class="tooltip">Esempio: {"Float Service": "Tustena Service"}</span>
+          </span>
+        </label>
+        <textarea id="service_mapping" name="service_mapping" rows="3" placeholder='{"Servizio Float": "Servizio Tustena"}'></textarea>
+        <span class="field-error-msg" id="err-service-mapping">JSON non valido.</span>
+      </div>
     </div>
 
     <!-- Legacy / Advanced options -->
@@ -148,11 +166,6 @@
   </div>
 
   <div class="step2-header">
-    <div class="step2-counts">
-      <span id="step2-count" class="step2-count"></span>
-      <span id="step2-exists" class="step2-exists" style="display:none"></span>
-      <span id="step2-errors" class="step2-errors" style="display:none"></span>
-    </div>
     <div class="step2-actions">
       <button type="button" class="btn-toggle-exists" id="toggle-exists-btn" style="display:none">Nascondi già presenti</button>
     </div>
