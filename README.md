@@ -17,67 +17,28 @@ L'app sarà disponibile su `http://localhost:5001`.
 
 Permettono di pre-compilare i campi nell'UI al primo avvio:
 
-| Variabile         | Descrizione                                          |
-| ----------------- | ---------------------------------------------------- |
-| `TUSTENA_API_KEY` | API Key Tustena (da SETUP > UTENTI nel CRM)          |
-| `FLOAT_API_KEY`   | API Key Float (Al momento non disponibile)           |
-| `FLOAT_ICAL_URL`  | URL del feed iCal personale di Float                 |
+| Variabile         | Descrizione                  | Dove si trova                                                 |
+| ----------------- | ---------------------------- | ------------------------------------------------------------- |
+| `TUSTENA_API_KEY` | API Key del CRM Tustena      | Tustena CRM → Setup → Gestione Account → Web API Keys → Nuova |
+| `FLOAT_ICAL_URL`  | URL del feed iCal di Float   | Personal → Calendar Integrations → Copy the link              |
 
 ```bash
 export TUSTENA_API_KEY=la-tua-key
-export FLOAT_API_KEY=la-tua-float-key
 export FLOAT_ICAL_URL=https://ical.float.com/...
 docker compose up --build -d
 ```
 
 ## Come si usa
 
-### Flusso Tustena (CSV)
-
-Usa l'export CSV di Float. Non richiede l'API Key di Float.
-
-1. Inserisci la tua **API Key Tustena**
-2. Assicurati che il chip **Tustena** sia selezionato
-3. Esporta le allocazioni da Float: **Filtra "Me" → Share → Export .csv → Day**
-4. Carica il file CSV (il più recente in `~/Downloads` viene caricato automaticamente)
-5. Seleziona il periodo (**Giorno** per filtrare su una data, **Tutti** per importare tutto)
-5. Clicca **Anteprima** e rivedi i voucher
-6. Compila il contenuto del rapportino per ogni voucher
-7. Clicca **Crea Voucher**
-
-> Dopo la creazione, invia manualmente la mail di rapportino da Tustena CRM.
-
-### Flusso Tustena+Float (API)
-
-Usa le API Float per recuperare le allocazioni in tempo reale. Permette anche di marcare le allocazioni come completate in Float.
-
-1. Inserisci la tua **API Key Tustena**
-2. Seleziona il chip **Tustena+Float** e inserisci la **API Key Float**
-3. Seleziona il periodo (**Giorno** o **Periodo**)
-4. Clicca **Anteprima** e rivedi i voucher
-5. Compila il contenuto del rapportino per ogni voucher
-6. Clicca **Crea Voucher**
-
-Al termine le allocazioni Float vengono automaticamente marcate come **completate**.
-
-> Dopo la creazione, invia manualmente la mail di rapportino da Tustena CRM.
-
-### Flusso Tustena+iCal
-
-Usa il feed iCal personale di Float per recuperare le allocazioni, senza richiedere la API Key Float. Le allocazioni non vengono marcate come completate su Float.
-
-1. Inserisci la tua **API Key Tustena**
-2. Seleziona il chip **Tustena+iCal** e inserisci l'**URL iCal** di Float
-3. Seleziona il periodo (**Tutti**, **Giorno** o **Periodo**)
-4. Clicca **Anteprima** e rivedi i voucher
-5. Compila il contenuto del rapportino per ogni voucher
-6. Clicca **Crea Voucher**
+1. Inserisci la tua **API Key Tustena** e l'**URL del feed iCal** di Float nelle Impostazioni e salva. La configurazione viene memorizzata nel browser e non è necessario reinserirla.
+2. La dashboard mostra le allocazioni della settimana corrente, raggruppate per giorno. Usa le frecce per navigare tra le settimane.
+3. Clicca **Crea** sul singolo voucher per inviarlo a Tustena.
 
 > Dopo la creazione, invia manualmente la mail di rapportino da Tustena CRM.
 
 ## Risoluzione mismatch nomi
 
-Alcuni iovoucher potrebbero andare in errore questo accade perchè il nome azienda o servizio su Float non corrisponde a quello su Tustena. Usa la ricerca inline direttamente nel voucher per trovare il nome corretto e mapparlo: il mapping viene salvato automaticamente nelle Impostazioni e riapplicato alle sessioni successive.
+Alcuni voucher potrebbero andare in errore perché il nome azienda o servizio su Float non corrisponde a quello su Tustena. Usa la ricerca inline direttamente sul voucher per trovare il nome corretto e mapparlo: il mapping viene salvato automaticamente nelle Impostazioni e riapplicato alle sessioni successive.
 
 ## Note tecniche
 
@@ -91,13 +52,3 @@ Voucher B: 13:00 → 17:00
 ```
 
 Gli orari sono modificabili nell'anteprima prima della creazione se necessario.
-
-## Changelog
-
-### 01/04/2026
-- **feat**: aggiunto flusso **Tustena+iCal** — recupera le allocazioni dal feed iCal personale di Float senza richiedere la API Key Float
-- **feat**: filtro festività italiane nel flusso iCal (via Nager.Date) — _sperimentale_: se disattivato, verificare manualmente le date dei voucher per evitare di crearne in giorni festivi
-
-## Sviluppi futuri
-
-- **Invio email automatico**: invio automatico della mail di rapportino da Tustena al termine della creazione dei voucher.

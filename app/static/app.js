@@ -1,12 +1,9 @@
 /* ── State ────────────────────────────────────────────────────────────────── */
 
-let previewData  = [];
-let currentWeekOffset = 0;
-let csvFile      = null;
-
-function getLegacyMode() {
-  return document.querySelector('.mode-chip.active')?.dataset.mode || 'none';
-}
+let previewData         = [];
+let currentWeekOffset   = 0;
+let _previewAbortCtrl   = null;
+let _loadWeekTimer      = null;
 
 /* ── Bootstrapping & Navigation ───────────────────────────────────────────── */
 
@@ -21,8 +18,8 @@ function showSettings() {
 function showMainView() {
   settingsView.style.display = 'none';
   mainView.style.display     = 'block';
-  document.getElementById('holiday-warning').style.display = 
-    (!document.getElementById('skip_holidays').checked) ? '' : 'none';
+  document.getElementById('holiday-warning').style.display =
+    document.getElementById('skip_holidays').checked ? 'none' : '';
   loadWeek();
 }
 
@@ -44,14 +41,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const local_tustena = localStorage.getItem('tustena_api_key');
   const local_ical    = localStorage.getItem('ical_url');
-  const local_float   = localStorage.getItem('float_api_key');
   const skip_holidays = localStorage.getItem('skip_holidays');
   const local_cm      = localStorage.getItem('company_mapping');
   const local_sm      = localStorage.getItem('service_mapping');
 
   if (local_tustena) document.getElementById('tustena_api_key').value = local_tustena;
   if (local_ical)    document.getElementById('ical_url').value = local_ical;
-  if (local_float)   document.getElementById('float_api_key').value = local_float;
   if (skip_holidays) document.getElementById('skip_holidays').checked = skip_holidays === 'true';
   if (local_cm) document.getElementById('company_mapping').value = _prettyJson(local_cm);
   if (local_sm) document.getElementById('service_mapping').value = _prettyJson(local_sm);
@@ -94,68 +89,17 @@ function getWeekBoundaries(offset) {
   const monday = new Date(d.setDate(diff + (offset * 7)));
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
-  return {
-    start: toLocalDateStr(monday),
-    end: toLocalDateStr(sunday),
-    monday, sunday
-  };
+  return { start: toLocalDateStr(monday), end: toLocalDateStr(sunday), monday, sunday };
 }
 
 /* ── UI Interactions ──────────────────────────────────────────────────────── */
-
-document.getElementById('advanced_toggle').addEventListener('change', function() {
-  document.getElementById('advanced-container').style.display = this.checked ? 'block' : 'none';
-});
 
 document.getElementById('mapping-toggle').addEventListener('change', function() {
   document.getElementById('mapping-fields').style.display = this.checked ? 'block' : 'none';
 });
 
-document.querySelectorAll('.mode-chip').forEach(chip => {
-  chip.addEventListener('click', () => {
-    document.querySelectorAll('.mode-chip').forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
-    const mode = chip.dataset.mode;
-    document.getElementById('mode-csv').style.display   = (mode === 'csv') ? 'block' : 'none';
-    document.getElementById('mode-float').style.display = (mode === 'float') ? 'block' : 'none';
-  });
-});
-
-document.getElementById('week-prev-btn').addEventListener('click', () => { currentWeekOffset--; loadWeek(); });
-document.getElementById('week-next-btn').addEventListener('click', () => { currentWeekOffset++; loadWeek(); });
-
-/* ── Drop Zone ────────────────────────────────────────────────────────────── */
-
-{
-  const dropZone  = document.getElementById('csv_drop_zone');
-  const fileInput = document.getElementById('csv_file');
-  const fileName  = document.getElementById('csv_filename');
-
-  function setCsvFile(file) {
-    if (!file || !file.name.endsWith('.csv')) return;
-    csvFile = file;
-    fileName.textContent = file.name;
-    document.getElementById('err-csv-file')?.classList.remove('visible');
-  }
-
-  dropZone.addEventListener('click', () => fileInput.click());
-
-  fetch('/latest_csv').then(async resp => {
-    if (!resp.ok) return;
-    const blob = await resp.blob();
-    const name = resp.headers.get('Content-Disposition')?.match(/filename="?([^"]+)"?/)?.[1] || 'latest.csv';
-    setCsvFile(new File([blob], name, { type: 'text/csv' }));
-  }).catch(() => {});
-  fileInput.addEventListener('change', () => setCsvFile(fileInput.files[0]));
-
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-  dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
-  dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropZone.classList.remove('drag-over');
-    setCsvFile(e.dataTransfer.files[0]);
-  });
-}
+document.getElementById('week-prev-btn').addEventListener('click', () => { currentWeekOffset--; scheduleLoadWeek(); });
+document.getElementById('week-next-btn').addEventListener('click', () => { currentWeekOffset++; scheduleLoadWeek(); });
 
 /* ── Theme Toggle ─────────────────────────────────────────────────────────── */
 
@@ -178,37 +122,25 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
 
 /* ── Load Week ────────────────────────────────────────────────────────────── */
 
+function scheduleLoadWeek() {
+  const bounds = getWeekBoundaries(currentWeekOffset);
+  const df = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'short' });
+  document.getElementById('week-title').textContent = `${df.format(bounds.monday)} — ${df.format(bounds.sunday)}`;
+  clearTimeout(_loadWeekTimer);
+  _loadWeekTimer = setTimeout(() => loadWeek(), 300);
+}
+
 async function loadWeek() {
   const bounds = getWeekBoundaries(currentWeekOffset);
   const df = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'short' });
-  const titleStr = `${df.format(bounds.monday)} — ${df.format(bounds.sunday)}`;
-  document.getElementById('week-title').textContent = titleStr;
-  
-  const mode = getLegacyMode();
-  const list = document.getElementById('voucher-list');
-  const legacyWrap = document.getElementById('legacy-preview-wrapper');
-  
-  if (mode === 'none') {
-    legacyWrap.style.display = 'none';
-    setLoadingState();
-    await fetchPreview('ical', bounds);
-  } else {
-    list.innerHTML = `<div class="voucher-date-sep" style="text-align:center; padding: 2rem;">Modalità Legacy: Clicca anteprima per caricare i task in questo intervallo.</div>`;
-    legacyWrap.style.display = 'flex';
-  }
+  document.getElementById('week-title').textContent = `${df.format(bounds.monday)} — ${df.format(bounds.sunday)}`;
+  setLoadingState();
+  await fetchPreview(bounds);
 }
 
-document.getElementById('legacy-preview-btn').addEventListener('click', async () => {
-  setLoadingState();
-  const mode = getLegacyMode();
-  const bounds = getWeekBoundaries(currentWeekOffset);
-  await fetchPreview(mode, bounds);
-});
-
 function setLoadingState() {
-  const list = document.getElementById('voucher-list');
-  list.innerHTML = `
-    <div class="loading-state" style="display:flex; flex-direction:column; align-items:center;  padding:3rem 0; color:var(--text-muted); gap: 1rem;">
+  document.getElementById('voucher-list').innerHTML = `
+    <div class="loading-state" style="display:flex; flex-direction:column; align-items:center; padding:3rem 0; color:var(--text-muted); gap: 1rem;">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="spinner" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
       </svg>
@@ -221,57 +153,33 @@ function setListError(msg) {
   document.getElementById('voucher-list').innerHTML = `<div class="form-error" style="display:block">${msg}</div>`;
 }
 
-async function fetchPreview(mode, bounds) {
-  const tk = document.getElementById('tustena_api_key').value.trim();
-  const ic = document.getElementById('ical_url').value.trim();
-  const fk = document.getElementById('float_api_key').value.trim();
+async function fetchPreview(bounds) {
+  const tk   = document.getElementById('tustena_api_key').value.trim();
+  const ic   = document.getElementById('ical_url').value.trim();
   const skip = document.getElementById('skip_holidays').checked;
+  const cm   = document.getElementById('company_mapping')?.value.trim() || '{}';
+  const sm   = document.getElementById('service_mapping')?.value.trim() || '{}';
 
-  let fetchUrl, fetchInit;
+  if (!ic) return setListError('URL iCal mancante nelle impostazioni.');
 
-  const cm = document.getElementById('company_mapping')?.value.trim() || '{}';
-  const sm = document.getElementById('service_mapping')?.value.trim() || '{}';
-
-  if (mode === 'csv') {
-    if (!csvFile) return setListError('Seleziona prima il file CSV nelle Impostazioni.');
-    const fd = new FormData();
-    fd.append('tustena_api_key', tk);
-    fd.append('csv_file', csvFile);
-    fd.append('date_from', bounds.start);
-    fd.append('date_to', bounds.end);
-    fd.append('company_mapping', cm);
-    fd.append('service_mapping', sm);
-    fetchUrl  = '/preview_csv';
-    fetchInit = { method: 'POST', body: fd };
-  } else if (mode === 'ical') {
-    if (!ic) return setListError('URL iCal mancante nelle impostazioni.');
-    fetchUrl  = '/preview_ical';
-    fetchInit = { 
-      method: 'POST', 
-      headers: { 'Content-Type': 'application/json' }, 
-      body: JSON.stringify({ tustena_api_key: tk, ical_url: ic, skip_holidays: skip, date_from: bounds.start, date_to: bounds.end, company_mapping: cm, service_mapping: sm }) 
-    };
-  } else if (mode === 'float') {
-    if (!fk) return setListError('API Key Float mancante nelle impostazioni.');
-    fetchUrl  = '/preview';
-    fetchInit = { 
-      method: 'POST', 
-      headers: { 'Content-Type': 'application/json' }, 
-      body: JSON.stringify({ tustena_api_key: tk, float_api_key: fk, date_from: bounds.start, date_to: bounds.end, company_mapping: cm, service_mapping: sm }) 
-    };
-  }
+  if (_previewAbortCtrl) _previewAbortCtrl.abort();
+  _previewAbortCtrl = new AbortController();
+  const signal = _previewAbortCtrl.signal;
 
   try {
-    const resp = await fetch(fetchUrl, fetchInit);
+    const resp = await fetch('/preview_ical', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tustena_api_key: tk, ical_url: ic, skip_holidays: skip, date_from: bounds.start, date_to: bounds.end, company_mapping: cm, service_mapping: sm }),
+      signal,
+    });
     const text = await resp.text();
     let json;
     try { json = JSON.parse(text); } catch { return setListError(text); }
-
-    if (!resp.ok) {
-      return setListError(resp.status < 500 ? (json.error || 'Errore') : 'Si è verificato un errore.');
-    }
+    if (!resp.ok) return setListError(resp.status < 500 ? (json.error || 'Errore') : 'Si è verificato un errore.');
     renderPreview(json.allocations);
   } catch (err) {
+    if (err.name === 'AbortError') return;
     setListError('Errore di rete: ' + err.message);
   }
 }
@@ -304,12 +212,12 @@ function _validateJsonField(el) {
   }
 }
 
-
 /* ── Save Settings ────────────────────────────────────────────────────────── */
 
-document.getElementById('settings-form').addEventListener('submit', async e => {
+document.getElementById('settings-form').addEventListener('submit', e => {
   e.preventDefault();
   const tustenaEl = document.getElementById('tustena_api_key');
+  const icalEl    = document.getElementById('ical_url');
   const companyEl = document.getElementById('company_mapping');
   const serviceEl = document.getElementById('service_mapping');
   let valid = true;
@@ -317,33 +225,28 @@ document.getElementById('settings-form').addEventListener('submit', async e => {
   if (!_validateJsonField(companyEl)) valid = false;
   if (!_validateJsonField(serviceEl)) valid = false;
 
-  const icalEl   = document.getElementById('ical_url');
-  const errTustena = document.getElementById('err-tustena-api-key');
-  const errIcal    = document.getElementById('err-ical-url');
-
   if (!tustenaEl.value.trim()) {
     tustenaEl.classList.add('input-error');
-    if (errTustena) errTustena.classList.add('visible');
+    document.getElementById('err-tustena-api-key')?.classList.add('visible');
     valid = false;
   } else {
     tustenaEl.classList.remove('input-error');
-    if (errTustena) errTustena.classList.remove('visible');
+    document.getElementById('err-tustena-api-key')?.classList.remove('visible');
   }
 
   if (!icalEl.value.trim()) {
     icalEl.classList.add('input-error');
-    if (errIcal) errIcal.classList.add('visible');
+    document.getElementById('err-ical-url')?.classList.add('visible');
     valid = false;
   } else {
     icalEl.classList.remove('input-error');
-    if (errIcal) errIcal.classList.remove('visible');
+    document.getElementById('err-ical-url')?.classList.remove('visible');
   }
 
   if (!valid) return;
-  
+
   localStorage.setItem('tustena_api_key', tustenaEl.value.trim());
-  localStorage.setItem('ical_url', document.getElementById('ical_url').value.trim());
-  localStorage.setItem('float_api_key', document.getElementById('float_api_key').value.trim());
+  localStorage.setItem('ical_url', icalEl.value.trim());
   localStorage.setItem('skip_holidays', document.getElementById('skip_holidays').checked);
   localStorage.setItem('company_mapping', companyEl.value.trim());
   localStorage.setItem('service_mapping', serviceEl.value.trim());
@@ -355,7 +258,7 @@ document.getElementById('settings-form').addEventListener('submit', async e => {
 
 function renderPreview(allocations) {
   previewData = allocations;
-  const list = document.getElementById('voucher-list');
+  const list  = document.getElementById('voucher-list');
 
   if (!allocations || allocations.length === 0) {
     list.innerHTML = `<div style="text-align:center; padding: 2rem; color: var(--text-muted);">Nessuna allocazione trovata per il periodo.</div>`;
@@ -393,7 +296,7 @@ function renderPreview(allocations) {
       if (t.error) {
         row.className = 'voucher-row voucher-error';
         let errorAction = `<div class="voucher-error-msg">${t.error}</div>`;
-        
+
         if (t.error_type === 'company') {
           const q = t.error_query ? t.error_query.replace(/"/g, '&quot;') : '';
           errorAction = `
@@ -415,11 +318,10 @@ function renderPreview(allocations) {
                   </div>
                 </div>
               </div>
-            </div>
-          `;
+            </div>`;
         } else if (t.error_type === 'service') {
-          const q = t.error_query ? t.error_query.replace(/"/g, '&quot;') : '';
-          const co = t.company_name ? t.company_name.replace(/"/g, '&quot;') : '';
+          const q  = t.error_query   ? t.error_query.replace(/"/g, '&quot;')   : '';
+          const co = t.company_name  ? t.company_name.replace(/"/g, '&quot;')  : '';
           const ct = t.contract_code ? t.contract_code.replace(/"/g, '&quot;') : '';
           errorAction = `
             <div class="voucher-error-action" data-type="service" data-query="${q}" data-company="${co}" data-contract="${ct}">
@@ -439,8 +341,7 @@ function renderPreview(allocations) {
                   </div>
                 </div>
               </div>
-            </div>
-          `;
+            </div>`;
         }
 
         row.innerHTML = `
@@ -449,6 +350,7 @@ function renderPreview(allocations) {
             <div class="vm-secondary" title="${t.client_name}">${t.client_name}</div>
           </div>
           ${errorAction}`;
+
       } else if (t.exists) {
         row.className = 'voucher-row voucher-exists';
         row.innerHTML = `
@@ -457,6 +359,7 @@ function renderPreview(allocations) {
             <div class="vm-secondary" title="${t.client_name}">${t.client_name}</div>
           </div>
           <span class="voucher-badge-exists">Già presente</span>`;
+
       } else {
         row.className = 'voucher-row';
         row.innerHTML = `
@@ -484,10 +387,10 @@ function renderPreview(allocations) {
             </div>
           </div>
           <textarea class="voucher-description" placeholder="Contenuto Del Rapportino…" rows="1">${t.notes || ''}</textarea>`;
-        
+
         row.querySelectorAll('input[type="time"]').forEach(inp => {
-          inp.addEventListener('input',  () => { updateDuration(row, t.hours); });
-          inp.addEventListener('change', () => { updateDuration(row, t.hours); });
+          inp.addEventListener('input',  () => updateDuration(row, t.hours));
+          inp.addEventListener('change', () => updateDuration(row, t.hours));
         });
         updateDuration(row, t.hours);
       }
@@ -495,13 +398,11 @@ function renderPreview(allocations) {
     });
   });
 
-  // Manage visibility
   const existsCount = allocations.filter(t => t.exists).length;
-  const toggleBtn = document.getElementById('toggle-exists-btn');
+  const toggleBtn   = document.getElementById('toggle-exists-btn');
   toggleBtn.style.display = existsCount > 0 ? '' : 'none';
   toggleBtn.dataset.hidden = 'true';
   toggleBtn.textContent = `Mostra ${existsCount} già present${existsCount === 1 ? 'e' : 'i'}`;
-
   document.querySelectorAll('.voucher-exists').forEach(r => r.style.display = 'none');
   updateDateSeparators();
 }
@@ -519,17 +420,14 @@ function updateDateSeparators() {
 }
 
 document.getElementById('toggle-exists-btn').addEventListener('click', () => {
-  const btn = document.getElementById('toggle-exists-btn');
+  const btn    = document.getElementById('toggle-exists-btn');
   const hiding = btn.dataset.hidden === 'false';
-  document.querySelectorAll('.voucher-exists').forEach(row => {
-    row.style.display = hiding ? 'none' : '';
-  });
+  document.querySelectorAll('.voucher-exists').forEach(row => { row.style.display = hiding ? 'none' : ''; });
   updateDateSeparators();
   btn.dataset.hidden = hiding ? 'true' : 'false';
   const cnt = document.querySelectorAll('.voucher-exists').length;
   btn.textContent = hiding ? `Mostra ${cnt} già present${cnt === 1 ? 'e' : 'i'}` : 'Nascondi già presenti';
 });
-
 
 function updateDuration(row, expectedHours) {
   const startInput = row.querySelector('[data-field="start"]');
@@ -540,7 +438,11 @@ function updateDuration(row, expectedHours) {
   const startVal = startInput.value;
   const endVal   = endInput.value;
 
-  if (!startVal || !endVal) { durEl.textContent = '—'; if(btn) { btn.disabled=true; btn.title='Inserisci orario di inizio e fine'; } return; }
+  if (!startVal || !endVal) {
+    durEl.textContent = '—';
+    if (btn) { btn.disabled = true; btn.title = 'Inserisci orario di inizio e fine'; }
+    return;
+  }
 
   const [sh, sm] = startVal.split(':').map(Number);
   const [eh, em] = endVal.split(':').map(Number);
@@ -552,7 +454,7 @@ function updateDuration(row, expectedHours) {
     endInput.classList.add('input-error');
     durEl.textContent = 'Fine ≤ Inizio';
     durEl.className = 'voucher-duration voucher-hours--diff';
-    if(btn) { btn.disabled=true; btn.title='Orario non valido: fine ≤ inizio'; }
+    if (btn) { btn.disabled = true; btn.title = 'Orario non valido: fine ≤ inizio'; }
     return;
   }
 
@@ -563,81 +465,69 @@ function updateDuration(row, expectedHours) {
   durEl.textContent = `Durata: ${actualH}h`;
   const hasDurationError = actualMins !== expectedMins;
   durEl.className = hasDurationError ? 'voucher-duration voucher-hours--diff' : 'voucher-duration';
-  if(btn) {
-    const descEl = row.querySelector('.voucher-description');
+
+  if (btn) {
+    const descEl   = row.querySelector('.voucher-description');
     const descEmpty = !descEl || !descEl.value.trim();
     if (descEl) descEl.classList.toggle('input-error', descEmpty);
     btn.disabled = hasDurationError || descEmpty;
-    if (hasDurationError)   btn.title = 'La durata non corrisponde a quella prevista da Float';
-    else if (descEmpty)     btn.title = 'Inserisci il contenuto del rapportino';
-    else                    btn.title = 'Crea voucher';
+    if (hasDurationError) btn.title = 'La durata non corrisponde a quella prevista da Float';
+    else if (descEmpty)   btn.title = 'Inserisci il contenuto del rapportino';
+    else                  btn.title = 'Crea voucher';
   }
 }
 
-// Global delegated listen to textarea
-document.getElementById('voucher-list').addEventListener('input', (e) => {
+document.getElementById('voucher-list').addEventListener('input', e => {
   if (e.target.classList.contains('voucher-description')) {
     const row = e.target.closest('.voucher-row');
-    const idx = row.dataset.idx;
-    const t = previewData[idx];
-    updateDuration(row, t.hours);
+    updateDuration(row, previewData[row.dataset.idx].hours);
   }
 });
 
 /* ── Run Row Execution ────────────────────────────────────────────────────── */
 
-document.getElementById('voucher-list').addEventListener('click', async (e) => {
+document.getElementById('voucher-list').addEventListener('click', async e => {
   const btn = e.target.closest('.btn-run-row');
   if (!btn) return;
-  
-  const idx = btn.dataset.idx;
-  const row = btn.closest('.voucher-row');
-  const t = previewData[idx];
-  
-  const descEl = row.querySelector('.voucher-description');
+
+  const idx    = btn.dataset.idx;
+  const row    = btn.closest('.voucher-row');
+  const t      = previewData[idx];
+  const descEl  = row.querySelector('.voucher-description');
   const startEl = row.querySelector('[data-field="start"]');
-  const endEl = row.querySelector('[data-field="end"]');
-  
+  const endEl   = row.querySelector('[data-field="end"]');
+
   const desc = descEl.value.trim();
   if (!desc) { descEl.classList.add('input-error'); return; }
   descEl.classList.remove('input-error');
 
   btn.disabled = true;
   btn.textContent = 'Creazione...';
-  
-  const tk = document.getElementById('tustena_api_key').value.trim();
-  const fk = document.getElementById('float_api_key')?.value.trim();
-  
-  const singleTask = {
-    ...t,
-    start_time: startEl.value,
-    end_time: endEl.value,
-    description: desc
-  };
 
-  const cm = document.getElementById('company_mapping')?.value.trim() || '{}';
-  const sm = document.getElementById('service_mapping')?.value.trim() || '{}';
-  
+  const tk = document.getElementById('tustena_api_key').value.trim();
+
   try {
     const resp = await fetch('/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tustena_api_key: tk, float_api_key: fk, tasks: [singleTask], company_mapping: cm, service_mapping: sm })
+      body: JSON.stringify({
+        tustena_api_key: tk,
+        tasks: [{ ...t, start_time: startEl.value, end_time: endEl.value, description: desc }],
+      }),
     });
-    
+
     const text = await resp.text();
     let json;
     try { json = JSON.parse(text); } catch { throw new Error(text); }
-
     if (!resp.ok) throw new Error(json.error || 'Errore HTTP');
-    
+
     const r = json.results[0];
     if (r.ok) {
       btn.textContent = 'Creato ✓';
       btn.style.background = 'var(--success)';
       startEl.disabled = true;
-      endEl.disabled = true;
-      descEl.disabled = true;
+      endEl.disabled   = true;
+      descEl.disabled  = true;
     } else {
       throw new Error(r.error);
     }
@@ -665,21 +555,21 @@ document.getElementById('voucher-list').addEventListener('click', async e => {
 
     if (type === 'company' && !query) return;
 
-    results.innerHTML = '<li class="company-search-loading" style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Ricerca in corso…</li>';
+    results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Ricerca in corso…</li>';
     container.style.display = '';
-    if (mappaBtn) { mappaBtn.disabled = true; }
+    if (mappaBtn) mappaBtn.disabled = true;
 
     try {
-      let resp, json;
+      let resp;
       if (type === 'company') {
         resp = await fetch(`/search_company?tustena_api_key=${encodeURIComponent(tustenaKey)}&q=${encodeURIComponent(query)}`);
       } else {
-        const company       = actionEl.dataset.company;
-        const contract      = actionEl.dataset.contract;
+        const company        = actionEl.dataset.company;
+        const contract       = actionEl.dataset.contract;
         const companyMapping = localStorage.getItem('company_mapping') || '';
         resp = await fetch(`/search_services?tustena_api_key=${encodeURIComponent(tustenaKey)}&company=${encodeURIComponent(company)}&contract=${encodeURIComponent(contract)}&company_mapping=${encodeURIComponent(companyMapping)}`);
       }
-      json = await resp.json();
+      const json = await resp.json();
 
       if (json.error) {
         results.innerHTML = `<li style="padding:0.35rem 0.6rem;color:var(--error);list-style:none;font-size:0.84rem">${json.error}</li>`;
@@ -688,8 +578,8 @@ document.getElementById('voucher-list').addEventListener('click', async e => {
       } else if (type === 'service' && !json.services.length) {
         results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Nessun risultato.</li>';
       } else {
-        const list = type === 'company' ? json.companies : json.services;
-        results.innerHTML = list.map(name => `<li class="inline-result-item" data-name="${name.replace(/"/g,'&quot;')}">${name}</li>`).join('');
+        const items = type === 'company' ? json.companies : json.services;
+        results.innerHTML = items.map(name => `<li class="inline-result-item" data-name="${name.replace(/"/g,'&quot;')}">${name}</li>`).join('');
       }
     } catch {
       results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--error);list-style:none;font-size:0.84rem">Errore di rete.</li>';
@@ -700,10 +590,8 @@ document.getElementById('voucher-list').addEventListener('click', async e => {
   const li = e.target.closest('.inline-result-item');
   if (li) {
     const actionEl = li.closest('.voucher-error-action');
-    const results  = actionEl.querySelector('.inline-search-results');
     const mappaBtn = actionEl.querySelector('.btn-mappa-confirm');
-
-    results.querySelectorAll('.inline-result-item').forEach(el => el.classList.remove('selected'));
+    actionEl.querySelectorAll('.inline-result-item').forEach(el => el.classList.remove('selected'));
     li.classList.add('selected');
     if (mappaBtn) mappaBtn.disabled = false;
     return;
@@ -715,44 +603,33 @@ document.getElementById('voucher-list').addEventListener('click', async e => {
     const selected = actionEl.querySelector('.inline-result-item.selected');
     if (!selected) return;
 
-    const type    = actionEl.dataset.type;
-    const errorQ  = actionEl.dataset.query;
-    const mapped  = selected.dataset.name;
-
+    const type       = actionEl.dataset.type;
+    const errorQ     = actionEl.dataset.query;
+    const mapped     = selected.dataset.name;
     const storageKey = type === 'company' ? 'company_mapping' : 'service_mapping';
-    const fieldId    = type === 'company' ? 'company_mapping' : 'service_mapping';
 
     let map = {};
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) map = JSON.parse(raw);
-    } catch(err) {}
-
+    try { const raw = localStorage.getItem(storageKey); if (raw) map = JSON.parse(raw); } catch(err) {}
     map[errorQ] = mapped;
     const newJson = JSON.stringify(map, null, 2);
-
     localStorage.setItem(storageKey, newJson);
-    const field = document.getElementById(fieldId);
+    const field = document.getElementById(storageKey);
     if (field) field.value = newJson;
-
-    if (document.getElementById('legacy-preview-wrapper').style.display !== 'none') {
-      document.getElementById('legacy-preview-btn').click();
-    } else {
-      loadWeek();
-    }
+    loadWeek();
   }
 });
 
 document.getElementById('voucher-list').addEventListener('keydown', e => {
   if (e.target.classList.contains('inline-search-input') && e.key === 'Enter') {
     e.preventDefault();
-    const btn = e.target.closest('.voucher-error-action').querySelector('.btn-inline-search');
-    if (btn) btn.click();
+    e.target.closest('.voucher-error-action').querySelector('.btn-inline-search')?.click();
   }
 });
 
+/* ── Help Modal ───────────────────────────────────────────────────────────── */
+
 const helpModal = document.getElementById('help-modal');
-const helpBtn = document.getElementById('help-btn');
+const helpBtn   = document.getElementById('help-btn');
 
 if (!localStorage.getItem('helpSeen')) {
   helpBtn.classList.add('help-btn-blink');
@@ -764,17 +641,18 @@ helpBtn.addEventListener('click', () => {
   helpBtn.classList.remove('help-btn-blink');
   localStorage.setItem('helpSeen', '1');
 });
+
 document.getElementById('help-ok-btn')?.addEventListener('click', () => {
   helpModal.classList.remove('open');
   helpModal.setAttribute('aria-hidden', 'true');
 });
 
+/* ── Holiday Modal ────────────────────────────────────────────────────────── */
+
 const holidayModal     = document.getElementById('holiday-modal');
-const holidayOkBtn     = document.getElementById('holiday-ok-btn');
-const holidayCancelBtn = document.getElementById('holiday-cancel-btn');
 const skipHolidaysCb   = document.getElementById('skip_holidays');
 
-skipHolidaysCb.addEventListener('change', function () {
+skipHolidaysCb.addEventListener('change', function() {
   if (!this.checked) {
     this.checked = true;
     holidayModal.classList.add('open');
@@ -782,13 +660,14 @@ skipHolidaysCb.addEventListener('change', function () {
   }
 });
 
-holidayCancelBtn?.addEventListener('click', () => {
+document.getElementById('holiday-cancel-btn')?.addEventListener('click', () => {
   holidayModal.classList.remove('open');
   holidayModal.setAttribute('aria-hidden', 'true');
 });
 
-holidayOkBtn?.addEventListener('click', () => {
+document.getElementById('holiday-ok-btn')?.addEventListener('click', () => {
   skipHolidaysCb.checked = false;
+  document.getElementById('holiday-warning').style.display = '';
   holidayModal.classList.remove('open');
   holidayModal.setAttribute('aria-hidden', 'true');
 });

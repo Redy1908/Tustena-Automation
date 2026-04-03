@@ -25,7 +25,7 @@
   <form id="settings-form">
     <div class="settings-header">
       <h2>Impostazioni</h2>
-      <span class="settings-subtitle">Configura le chiavi e i link necessari.</span>
+      <span class="settings-subtitle">Configura la connessione a Tustena e il feed iCal.</span>
     </div>
 
     <div class="field">
@@ -60,7 +60,16 @@
     </div>
 
     <div class="field-toggle-row">
-      <span class="field-toggle-label">Mapping nomi</span>
+      <span class="field-toggle-label" style="display:flex;align-items:center;gap:0.35rem;">Mapping nomi
+        <span class="info-icon" tabindex="0" aria-label="Info mapping nomi">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span class="tooltip" style="white-space:normal;width:17rem;text-align:left;line-height:1.5;">
+            Usato quando i nomi in Float non coincidono esattamente con quelli in Tustena.<br><br>
+            <strong>Company mapping</strong>: rinomina il cliente (es. <code>"ACME Srl" → "ACME S.R.L."</code>).<br><br>
+            <strong>Service mapping</strong>: rinomina il servizio (es. <code>"Support" → "Platform Support"</code>).
+          </span>
+        </span>
+      </span>
       <label class="toggle-switch">
         <input type="checkbox" id="mapping-toggle" />
         <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -90,48 +99,6 @@
         </label>
         <textarea id="service_mapping" name="service_mapping" rows="3" placeholder='{"Servizio Float": "Servizio Tustena"}'></textarea>
         <span class="field-error-msg" id="err-service-mapping">JSON non valido.</span>
-      </div>
-    </div>
-
-    <!-- Legacy / Advanced options -->
-    <div class="field-checkbox" style="margin-top: 1.5rem">
-      <label class="checkbox-label" style="font-weight: 500;">
-        <input type="checkbox" id="advanced_toggle" />
-        Mostra opzioni legacy (CSV / API)
-      </label>
-    </div>
-
-    <div id="advanced-container" style="display:none; padding-top: 1rem; border-top: 1px solid var(--border); margin-bottom: 1rem;">
-      <div class="mode-selector">
-        <button type="button" class="mode-chip active" data-mode="none">Nessuno</button>
-        <button type="button" class="mode-chip" data-mode="csv">CSV</button>
-        <button type="button" class="mode-chip" data-mode="float">Float API</button>
-      </div>
-
-      <div id="mode-csv" style="display:none">
-        <div class="field">
-          <label>File CSV Float</label>
-          <div class="drop-zone" id="csv_drop_zone">
-            <input type="file" id="csv_file" accept=".csv" hidden />
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="drop-zone-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <span class="drop-zone-text">Trascina il CSV qui o <u>clicca per sceglierlo</u></span>
-            <span class="drop-zone-filename" id="csv_filename"></span>
-          </div>
-          <span class="field-error-msg" id="err-csv-file">Seleziona un file CSV.</span>
-        </div>
-      </div>
-
-      <div id="mode-float" style="display:none">
-        <div class="field">
-          <label>Float API Key</label>
-          <input type="password" id="float_api_key" name="float_api_key" placeholder="float-api-key" value="{{ float_api_key }}" />
-          <span class="field-error-msg" id="err-float-api-key">Inserisci la Float API key.</span>
-        </div>
-      </div>
-      
-      <div class="warning-banner" style="margin-top: 0;">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <span style="flex:1">Nota: In modalità legacy, l'esecuzione sarà forzata solo sulla <b>settimana corrente</b>. Il caricamento di CSV richiederà un click extra su 'Anteprima' prima di far apparire la lista.</span>
       </div>
     </div>
 
@@ -165,8 +132,8 @@
     </button>
   </div>
 
-  <div class="step2-header">
-    <div class="step2-actions">
+  <div class="dashboard-header">
+    <div class="dashboard-actions">
       <button type="button" class="btn-toggle-exists" id="toggle-exists-btn" style="display:none">Nascondi già presenti</button>
     </div>
   </div>
@@ -183,9 +150,6 @@
     </div>
   </div>
 
-  <div class="legacy-preview-wrapper" id="legacy-preview-wrapper" style="display:none;">
-    <button class="btn" id="legacy-preview-btn">Mostra Anteprima CSV/API</button>
-  </div>
 </div>
 
 <div class="modal-backdrop" id="holiday-modal" aria-hidden="true">
@@ -206,20 +170,16 @@
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
     <h2 id="help-modal-title">Come funziona</h2>
     <div class="help-section">
-      <h3>Il Nuovo Workflow</h2>
-      <p>L'applicazione ora ragiona per <strong>Settimane</strong>. Imposta l'URL di <strong>Float iCal</strong> nelle Impostazioni e i voucher appariranno automaticamente divisi per giorno.</p>
+      <h3>Impostazioni</h3>
+      <p>Configura la <strong>API key Tustena</strong> e l'<strong>URL del feed iCal</strong> (Float) prima di utilizzare l'app. I mapping nomi permettono di correggere automaticamente le discrepanze tra i nomi presenti nel calendario e quelli in Tustena. La configurazione viene salvata nel browser e non è necessario reinserirla ad ogni accesso.</p>
     </div>
     <div class="help-section">
-      <h3>Creazione Puntuale</h3>
-      <p>Non c'è più un singolo bottone "Crea Voucher". Clicca <strong>Crea</strong> in corrispondenza del voucher per inviarlo a Tustena. L'operazione non può essere annullata, le modifiche andranno fatte su Tustena.</p>
+      <h3>Dashboard settimanale</h3>
+      <p>Le allocazioni del feed iCal vengono mostrate settimana per settimana, raggruppate per giorno. Usa le frecce per navigare tra le settimane.</p>
     </div>
     <div class="help-section">
-      <h3>Modi Funzionali (Legacy)</h3>
-      <p>Le modalità "Tustena+Float API" e "CSV" sono deprecate e nascoste dietro l'opzione "Avanzate" nelle Impostazioni. Sono limitate all'anteprima forzata della settimana corrente selezionata nella dashboard.</p>
-    </div>
-    <div class="help-section">
-      <h3>Nota</h3>
-      <p>Dopo la creazione dei voucher è necessario inviare manualmente la mail del rapportino da Tustena.</p>
+      <h3>Creazione voucher</h3>
+      <p>Clicca <strong>Crea</strong> sul singolo voucher per inviarlo a Tustena. L'operazione non può essere annullata: eventuali correzioni vanno effettuate direttamente su Tustena. Dopo la creazione ricordati di inviare il rapportino via mail da Tustena.</p>
     </div>
     <div class="modal-actions">
       <button type="button" class="btn" id="help-ok-btn">OK</button>
