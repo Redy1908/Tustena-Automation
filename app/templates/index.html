@@ -59,22 +59,10 @@
       </label>
     </div>
 
-    <div class="field-toggle-row">
-      <span class="field-toggle-label" style="display:flex;align-items:center;gap:0.35rem;">Mapping nomi
-        <span class="info-icon" tabindex="0" aria-label="Info mapping nomi">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-          <span class="tooltip" style="white-space:normal;width:17rem;text-align:left;line-height:1.5;">
-            Usato quando i nomi in Float non coincidono esattamente con quelli in Tustena.<br><br>
-            <strong>Company mapping</strong>: rinomina il cliente (es. <code>"ACME Srl" → "ACME S.R.L."</code>).<br><br>
-            <strong>Service mapping</strong>: rinomina il servizio (es. <code>"Support" → "Platform Support"</code>).
-          </span>
-        </span>
-      </span>
-      <label class="toggle-switch">
-        <input type="checkbox" id="mapping-toggle" />
-        <span class="toggle-track"><span class="toggle-thumb"></span></span>
-      </label>
-    </div>
+    <button type="button" class="mapping-collapse-btn" id="mapping-toggle" aria-expanded="false">
+      <span id="mapping-toggle-label" style="text-decoration:underline;text-underline-offset:2px;">Mostra Mapping Nomi</span>
+      <svg class="mapping-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
 
     <div id="mapping-fields" style="display:none">
       <div class="field">

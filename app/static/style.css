@@ -180,60 +180,33 @@ textarea.input-error {
 
 /* ── Toggle switch ────────────────────────────────────────────────────────── */
 
-.field-toggle-row {
+.mapping-collapse-btn {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.35rem;
+  background: none;
+  border: none;
+  padding: 0;
   margin-bottom: 1rem;
-}
-
-.field-toggle-label {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 500;
-  color: var(--text);
-}
-
-.toggle-switch {
-  position: relative;
-  display: inline-flex;
+  color: var(--primary);
   cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s;
 }
 
-.toggle-switch input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
+.mapping-collapse-btn:hover { opacity: 0.75; }
 
-.toggle-track {
-  width: 40px;
-  height: 22px;
-  background: var(--border);
-  border-radius: 999px;
-  transition: background 0.2s;
-  position: relative;
-  display: block;
-}
-
-.toggle-thumb {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 16px;
-  height: 16px;
-  background: #fff;
-  border-radius: 50%;
+.mapping-chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
   transition: transform 0.2s;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 
-.toggle-switch input:checked + .toggle-track {
-  background: var(--primary);
-}
-
-.toggle-switch input:checked + .toggle-track .toggle-thumb {
-  transform: translateX(18px);
+.mapping-collapse-btn[aria-expanded="true"] .mapping-chevron {
+  transform: rotate(180deg);
 }
 
 .checkbox-label {

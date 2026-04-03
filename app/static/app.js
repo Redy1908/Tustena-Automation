@@ -94,8 +94,11 @@ function getWeekBoundaries(offset) {
 
 /* ── UI Interactions ──────────────────────────────────────────────────────── */
 
-document.getElementById('mapping-toggle').addEventListener('change', function() {
-  document.getElementById('mapping-fields').style.display = this.checked ? 'block' : 'none';
+document.getElementById('mapping-toggle').addEventListener('click', function() {
+  const expanded = this.getAttribute('aria-expanded') === 'true';
+  this.setAttribute('aria-expanded', String(!expanded));
+  document.getElementById('mapping-fields').style.display = expanded ? 'none' : 'block';
+  document.getElementById('mapping-toggle-label').textContent = expanded ? 'Mostra Mapping Nomi' : 'Nascondi Mapping Nomi';
 });
 
 document.getElementById('week-prev-btn').addEventListener('click', () => { currentWeekOffset--; scheduleLoadWeek(); });
