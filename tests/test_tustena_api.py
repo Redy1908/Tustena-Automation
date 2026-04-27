@@ -1,42 +1,12 @@
-import json
 import pytest
-import tempfile
-import os
 from unittest.mock import patch, MagicMock
 from conftest import make_mock_response
-
-
-@pytest.fixture(autouse=True)
-def reset_mappings():
-    with (
-        patch("tustena_api._COMPANY_MAPPING", {}),
-        patch("tustena_api._SERVICE_MAPPING", {}),
-    ):
-        yield
 
 
 @pytest.fixture
 def mock_session():
     with patch("tustena_api._session") as m:
         yield m
-
-
-# ── _load_mapping ─────────────────────────────────────────────────────────────
-
-def test_load_mapping_reads_file():
-    from tustena_api import _load_mapping
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump({"FOO": "BAR"}, f)
-        path = f.name
-    try:
-        assert _load_mapping(path) == {"FOO": "BAR"}
-    finally:
-        os.unlink(path)
-
-
-def test_load_mapping_missing_file_returns_empty():
-    from tustena_api import _load_mapping
-    assert _load_mapping("/nonexistent/path.json") == {}
 
 
 # ── tustena_get_company_id ────────────────────────────────────────────────────
@@ -67,8 +37,7 @@ def test_get_company_id_multiple_matches_raises(mock_session):
 def test_get_company_id_applies_mapping(mock_session):
     mock_session.post.return_value = make_mock_response([{"id": 99, "companyName": "ACME MAPPED"}])
     from tustena_api import tustena_get_company_id
-    with patch("tustena_api._COMPANY_MAPPING", {"ACME ORIGINAL": "ACME MAPPED"}):
-        result = tustena_get_company_id("ACME ORIGINAL", "key")
+    result = tustena_get_company_id("ACME ORIGINAL", "key", overrides={"ACME ORIGINAL": "ACME MAPPED"})
     assert result == 99
     called_body = mock_session.post.call_args[1]["json"]
     assert "ACME MAPPED" in called_body["filter"]
@@ -112,8 +81,7 @@ def test_get_service_id_applies_mapping(mock_session):
         {"id": 100, "catalogDescription": "Platform Support Mapped"},
     ])
     from tustena_api import tustena_get_service_id
-    with patch("tustena_api._SERVICE_MAPPING", {"Platform Support": "Platform Support Mapped"}):
-        result = tustena_get_service_id(10, "Platform Support", "key")
+    result = tustena_get_service_id(10, "Platform Support", "key", overrides={"Platform Support": "Platform Support Mapped"})
     assert result == 100
 
 

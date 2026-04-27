@@ -1,12 +1,9 @@
-import glob
+import json
 import logging
 import os
-import tempfile
 import requests
-from flask import Flask, jsonify, render_template, request, send_file
-from csv_parsing import parse_float_people_csv
+from flask import Flask, jsonify, render_template, request
 from ical_parsing import parse_ical_feed
-from float_api import float_get_allocations, float_get_person_id, float_mark_task_completed
 from tustena_api import (
     tustena_get_company_id, tustena_get_contract_id, tustena_get_service_id,
     tustena_create_voucher, tustena_get_existing_voucher_subjects,
@@ -38,75 +35,67 @@ def _friendly_error(e: Exception) -> tuple[str, int]:
 
 
 def _get_tustena_context(api_key: str) -> tuple[str, str]:
-    """Return (tustena_user_id, person_fullname) for the authenticated user."""
     template = tustena_get_activity_template(api_key)
     return template["createdById"], tustena_get_current_user_fullname(api_key)
 
 
-def _resolve_tustena_ids(task: dict, api_key: str, cache: dict) -> dict:
+def _resolve_tustena_ids(task: dict, api_key: str, cache: dict, company_mapping: dict = None, service_mapping: dict = None) -> dict:
+    parts = task.get("project_name", "").split(" / ", 1)
+    contract_code       = parts[0].strip() if parts else ""
+    service_description = parts[1].strip() if len(parts) > 1 else ""
+    name = task.get("client_name", "")
+
     try:
-        parts = task["project_name"].split(" / ", 1)
-        contract_code       = parts[0].strip()
-        service_description = parts[1].strip() if len(parts) > 1 else ""
-
-        name = task["client_name"]
         if name not in cache["companies"]:
-            cache["companies"][name] = tustena_get_company_id(name, api_key)
+            cache["companies"][name] = tustena_get_company_id(name, api_key, overrides=company_mapping)
         company_id = cache["companies"][name]
+    except Exception as e:
+        msg, _ = _friendly_error(e)
+        return {**task, "error": msg, "error_type": "company", "error_query": name}
 
+    try:
         key_c = (company_id, contract_code)
         if key_c not in cache["contracts"]:
             cache["contracts"][key_c] = tustena_get_contract_id(company_id, contract_code, api_key)
         contract_id = cache["contracts"][key_c]
+    except Exception as e:
+        msg, _ = _friendly_error(e)
+        return {**task, "error": msg, "error_type": "contract", "error_query": contract_code, "company_name": name}
 
+    try:
         key_s = (contract_id, service_description)
         if key_s not in cache["services"]:
-            cache["services"][key_s] = tustena_get_service_id(contract_id, service_description, api_key)
+            cache["services"][key_s] = tustena_get_service_id(contract_id, service_description, api_key, overrides=service_mapping)
         service_id = cache["services"][key_s]
-
-        return {**task, "company_id": company_id, "contract_id": contract_id, "service_id": service_id}
     except Exception as e:
-        logger.error("Error enriching task %s: %s", task.get("project_name"), e)
         msg, _ = _friendly_error(e)
-        return {**task, "error": msg}
+        return {**task, "error": msg, "error_type": "service", "error_query": service_description, "company_name": name, "contract_code": contract_code}
+
+    return {**task, "company_id": company_id, "contract_id": contract_id, "service_id": service_id}
 
 
-def _enrich_and_check(tasks: list, api_key: str, tustena_user_id: str) -> list:
-    """Resolve Tustena IDs and flag duplicate vouchers."""
+def _enrich_and_check(tasks: list, api_key: str, tustena_user_id: str, company_mapping: dict = None, service_mapping: dict = None) -> list:
     cache    = {"companies": {}, "contracts": {}, "services": {}}
-    resolved = [_resolve_tustena_ids(task, api_key, cache) for task in tasks]
+    resolved = [_resolve_tustena_ids(task, api_key, cache, company_mapping, service_mapping) for task in tasks]
     ok_tasks = [task for task in resolved if "error" not in task]
 
-    # Build per-company date ranges
     company_dates: dict[int, tuple] = {}
     for task in ok_tasks:
         company_id, start_date = task["company_id"], task["start_date"]
         date_from, date_to = company_dates.get(company_id, (start_date, start_date))
         company_dates[company_id] = (min(date_from, start_date), max(date_to, start_date))
 
-    # Fetch existing voucher subjects
     subjects: dict = {}
     for company_id, (date_from, date_to) in company_dates.items():
         try:
             subjects |= {(company_id, day): s for day, s in tustena_get_existing_voucher_subjects(date_from, date_to, company_id, api_key, tustena_user_id).items()}
         except Exception as e:
-            logger.error("Failed to fetch existing subjects for company %s (%s – %s): %s", company_id, date_from, date_to, e)
+            logger.error("Failed to fetch existing subjects for company %s: %s", company_id, e)
 
     for task in ok_tasks:
         task["exists"] = f"{task['client_name']} / {task['project_name']}" in subjects.get((task["company_id"], task["start_date"]), set())
 
     return sorted(resolved, key=lambda t: t["start_date"])
-
-
-def _filter_tasks_by_date(tasks: list, date: str, date_from: str, date_to: str) -> list:
-    if date:
-        return [task for task in tasks if task["start_date"] == date]
-    filtered = tasks
-    if date_from:
-        filtered = [task for task in filtered if task["start_date"] >= date_from]
-    if date_to:
-        filtered = [task for task in filtered if task["start_date"] <= date_to]
-    return filtered
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -116,7 +105,6 @@ def index():
     return render_template(
         "index.html",
         tustena_api_key=os.environ.get("TUSTENA_API_KEY", ""),
-        float_api_key=os.environ.get("FLOAT_API_KEY", ""),
         float_ical_url=os.environ.get("FLOAT_ICAL_URL", ""),
     )
 
@@ -147,83 +135,16 @@ def search_services():
             return jsonify({"error": "API key mancante"}), 400
         if not company_name or not contract_code:
             return jsonify({"services": []})
-        services = tustena_search_services(company_name, contract_code, tustena_api_key)
+        raw_cm = request.args.get("company_mapping", "")
+        company_overrides = {}
+        if raw_cm:
+            try:
+                company_overrides = json.loads(raw_cm)
+            except (ValueError, TypeError):
+                pass
+        services = tustena_search_services(company_name, contract_code, tustena_api_key, company_overrides=company_overrides)
         return jsonify({"services": services})
     except Exception as e:
-        msg, status = _friendly_error(e)
-        return jsonify({"error": msg}), status
-
-
-@app.route("/latest_csv")
-def latest_csv():
-    downloads = os.path.join(os.path.expanduser("~"), "Downloads")
-    files = glob.glob(os.path.join(downloads, "float-people-*.csv"))
-    if not files:
-        return jsonify({"error": "Nessun file float-people-*.csv trovato in ~/Downloads"}), 404
-    latest = max(files, key=os.path.getmtime)
-    return send_file(latest, mimetype="text/csv", as_attachment=True,
-                     download_name=os.path.basename(latest))
-
-
-@app.route("/preview", methods=["POST"])
-def preview():
-    try:
-        data            = request.get_json(force=True)
-        tustena_api_key = data["tustena_api_key"]
-        float_api_key   = data["float_api_key"]
-        start           = data.get("date") or data.get("date_from")
-        end             = data.get("date") or data.get("date_to")
-
-        tustena_user_id, person_name = _get_tustena_context(tustena_api_key)
-        float_people_id = float_get_person_id(person_name, float_api_key)
-        tasks    = float_get_allocations(float_people_id, start, end, float_api_key)
-        enriched = _enrich_and_check(tasks, tustena_api_key, tustena_user_id)
-        return jsonify({"allocations": enriched})
-    except Exception as e:
-        logger.exception("Unhandled error in /preview")
-        msg, status = _friendly_error(e)
-        return jsonify({"error": msg}), status
-
-
-@app.route("/preview_csv", methods=["POST"])
-def preview_csv():
-    try:
-        tustena_api_key = request.form.get("tustena_api_key", "").strip()
-        csv_file        = request.files.get("csv_file")
-        if not tustena_api_key:
-            return jsonify({"error": "API key mancante"}), 400
-        if not csv_file:
-            return jsonify({"error": "File CSV mancante"}), 400
-
-        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-            csv_file.save(tmp.name)
-            tmp_path = tmp.name
-        try:
-            tasks = parse_float_people_csv(tmp_path)
-        except ValueError as e:
-            return jsonify({"error": str(e)}), 400
-        finally:
-            os.unlink(tmp_path)
-
-        if not tasks:
-            return jsonify({"error": "Nessuna allocazione billable trovata nel CSV."}), 400
-
-        tustena_user_id, person_name = _get_tustena_context(tustena_api_key)
-        csv_names = {t["name"] for t in tasks}
-        if len(csv_names) > 1:
-            return jsonify({"error": f"Il CSV contiene più persone: {sorted(csv_names)}. Esporta un CSV per singola persona."}), 400
-        csv_name = next(iter(csv_names))
-        if csv_name.lower() != person_name.lower():
-            return jsonify({"error": f"Il CSV appartiene a '{csv_name}', non a '{person_name}'."}), 400
-
-        tasks    = _filter_tasks_by_date(tasks,
-                       request.form.get("date", "").strip(),
-                       request.form.get("date_from", "").strip(),
-                       request.form.get("date_to", "").strip())
-        enriched = _enrich_and_check(tasks, tustena_api_key, tustena_user_id)
-        return jsonify({"allocations": enriched})
-    except Exception as e:
-        logger.exception("Unhandled error in /preview_csv")
         msg, status = _friendly_error(e)
         return jsonify({"error": msg}), status
 
@@ -243,18 +164,22 @@ def preview_ical():
         resp.raise_for_status()
 
         skip_holidays = data.get("skip_holidays", True)
+        date_from     = data.get("date_from", "").strip()
+        date_to       = data.get("date_to", "").strip()
         tasks = parse_ical_feed(resp.text, skip_holidays=skip_holidays)
-        tasks = _filter_tasks_by_date(
-            tasks,
-            data.get("date", "").strip(),
-            data.get("date_from", "").strip(),
-            data.get("date_to", "").strip(),
-        )
+        if date_from:
+            tasks = [t for t in tasks if t["start_date"] >= date_from]
+        if date_to:
+            tasks = [t for t in tasks if t["start_date"] <= date_to]
+
         if not tasks:
             return jsonify({"error": "Nessuna allocazione trovata nel feed iCal per il periodo selezionato."}), 400
 
         tustena_user_id, _ = _get_tustena_context(tustena_api_key)
-        enriched = _enrich_and_check(tasks, tustena_api_key, tustena_user_id)
+        cm = json.loads(data.get("company_mapping") or "{}")
+        sm = json.loads(data.get("service_mapping") or "{}")
+
+        enriched = _enrich_and_check(tasks, tustena_api_key, tustena_user_id, cm, sm)
         return jsonify({"allocations": enriched})
     except Exception as e:
         logger.exception("Unhandled error in /preview_ical")
@@ -267,15 +192,12 @@ def run():
     try:
         data            = request.get_json(force=True)
         tustena_api_key = data["tustena_api_key"]
-        float_api_key   = data.get("float_api_key", "")
         tasks           = data["tasks"]
         template        = tustena_get_activity_template(tustena_api_key)
         results         = []
         for task in tasks:
             try:
                 voucher_id = tustena_create_voucher(task, tustena_api_key, template)
-                if float_api_key and task.get("task_id"):
-                    float_mark_task_completed(task["task_id"], float_api_key)
                 results.append({"date": task["start_date"], "id": voucher_id, "ok": True})
             except Exception as e:
                 err_msg, _ = _friendly_error(e)

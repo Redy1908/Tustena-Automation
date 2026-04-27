@@ -6,8 +6,4 @@ services:
       - "5001:5001"
     environment:
       - TUSTENA_API_KEY
-      - FLOAT_API_KEY
       - FLOAT_ICAL_URL
-    volumes:
-      - ~/Downloads:/root/Downloads:ro
-      - ./mappings:/mappings

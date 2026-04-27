@@ -1,49 +1,67 @@
 /* ── State ────────────────────────────────────────────────────────────────── */
 
-let previewData  = [];
-let lastTustenaApiKey = '';
-let lastFloatApiKey = '';
-let activeTab    = 'all';
-let csvFile      = null;
+let previewData         = [];
+let currentWeekOffset   = 0;
+let _previewAbortCtrl   = null;
+let _loadWeekTimer      = null;
 
-function isCsvMode() {
-  return document.querySelector('.mode-chip.active')?.dataset.mode === 'csv';
+/* ── Bootstrapping & Navigation ───────────────────────────────────────────── */
+
+const settingsView = document.getElementById('settings-view');
+const mainView     = document.getElementById('main-view');
+
+function showSettings() {
+  mainView.style.display     = 'none';
+  settingsView.style.display = 'block';
 }
 
-function isIcalMode() {
-  return document.querySelector('.mode-chip.active')?.dataset.mode === 'ical';
+function showMainView() {
+  settingsView.style.display = 'none';
+  mainView.style.display     = 'block';
+  document.getElementById('holiday-warning').style.display =
+    document.getElementById('skip_holidays').checked ? 'none' : '';
+  loadWeek();
 }
 
+document.getElementById('view-settings-btn').addEventListener('click', showSettings);
 
-function _setTab(tab) {
-  activeTab = tab;
-  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-  document.getElementById('tab-all').style.display    = tab === 'all'    ? '' : 'none';
-  document.getElementById('tab-single').style.display = tab === 'single' ? 'block' : 'none';
-  document.getElementById('tab-range').style.display  = tab === 'range'  ? 'block' : 'none';
-  clearError('date', 'err-date');
-  clearError('date_from', 'err-date-range');
-  clearError('date_to', 'err-date-range');
-}
-
-document.querySelectorAll('.mode-chip').forEach(chip => {
-  chip.addEventListener('click', () => {
-    document.querySelectorAll('.mode-chip').forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
-    const mode = chip.dataset.mode;
-    const isFloat = mode === 'float';
-    const isIcal  = mode === 'ical';
-    document.getElementById('mode-float').style.display = isFloat ? '' : 'none';
-    document.getElementById('mode-ical').style.display  = isIcal  ? '' : 'none';
-    document.getElementById('mode-csv').style.display   = (isFloat || isIcal) ? 'none' : '';
-    // swap visible tabs: csv shows "Tutti"; float/ical show "Intervallo"
-    document.querySelector('.tab[data-tab="all"]').style.display   = (isFloat || isIcal) ? 'none' : '';
-    document.querySelector('.tab[data-tab="range"]').style.display = isFloat || isIcal ? '' : 'none';
-    // reset to sensible default for the mode
-    if ((isFloat || isIcal) && activeTab === 'all') _setTab('single');
-    if (!isFloat && !isIcal && activeTab === 'range') _setTab('all');
+document.addEventListener('DOMContentLoaded', () => {
+  ['company_mapping', 'service_mapping'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('blur', () => {
+      const pretty = _prettyJson(el.value);
+      if (pretty !== el.value) el.value = pretty;
+      _validateJsonField(el);
+    });
+    el.addEventListener('input', () => {
+      if (el.classList.contains('input-error')) _validateJsonField(el);
+    });
   });
+
+  const local_tustena = localStorage.getItem('tustena_api_key');
+  const local_ical    = localStorage.getItem('ical_url');
+  const skip_holidays = localStorage.getItem('skip_holidays');
+  const local_cm      = localStorage.getItem('company_mapping');
+  const local_sm      = localStorage.getItem('service_mapping');
+
+  if (local_tustena) document.getElementById('tustena_api_key').value = local_tustena;
+  if (local_ical)    document.getElementById('ical_url').value = local_ical;
+  if (skip_holidays) document.getElementById('skip_holidays').checked = skip_holidays === 'true';
+  if (local_cm) document.getElementById('company_mapping').value = _prettyJson(local_cm);
+  if (local_sm) document.getElementById('service_mapping').value = _prettyJson(local_sm);
+
+  const tk = document.getElementById('tustena_api_key').value.trim();
+  const ic = document.getElementById('ical_url').value.trim();
+
+  if (tk && ic) {
+    showMainView();
+  } else {
+    showSettings();
+  }
 });
+
+/* ── Date Helpers ─────────────────────────────────────────────────────────── */
 
 function toLocalDateStr(date) {
   return [
@@ -53,27 +71,9 @@ function toLocalDateStr(date) {
   ].join('-');
 }
 
-const now = new Date();
-document.getElementById('date').value      = toLocalDateStr(now);
-document.getElementById('date_from').value = toLocalDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
-document.getElementById('date_to').value   = toLocalDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
-
-/* ── Helpers ──────────────────────────────────────────────────────────────── */
-
-function showFormError(detail) {
-  const el = document.getElementById('form-error');
-  el.textContent = detail || 'Si è verificato un errore.';
-  el.style.display = 'block';
-}
-
-function showError(inputId, msgId) {
-  document.getElementById(inputId)?.classList.add('input-error');
-  document.getElementById(msgId)?.classList.add('visible');
-}
-
-function clearError(inputId, msgId) {
-  document.getElementById(inputId)?.classList.remove('input-error');
-  document.getElementById(msgId)?.classList.remove('visible');
+function formatDate(iso) {
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
 }
 
 function minsToTime(mins) {
@@ -82,45 +82,29 @@ function minsToTime(mins) {
   return `${h}:${m}`;
 }
 
-function formatDate(iso) {
-  const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y}`;
+function getWeekBoundaries(offset) {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d.setDate(diff + (offset * 7)));
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { start: toLocalDateStr(monday), end: toLocalDateStr(sunday), monday, sunday };
 }
 
-/* ── Drop zone ────────────────────────────────────────────────────────────── */
+/* ── UI Interactions ──────────────────────────────────────────────────────── */
 
-{
-  const dropZone  = document.getElementById('csv_drop_zone');
-  const fileInput = document.getElementById('csv_file');
-  const fileName  = document.getElementById('csv_filename');
+document.getElementById('mapping-toggle').addEventListener('click', function() {
+  const expanded = this.getAttribute('aria-expanded') === 'true';
+  this.setAttribute('aria-expanded', String(!expanded));
+  document.getElementById('mapping-fields').style.display = expanded ? 'none' : 'block';
+  document.getElementById('mapping-toggle-label').textContent = expanded ? 'Mostra Mapping Nomi' : 'Nascondi Mapping Nomi';
+});
 
-  function setCsvFile(file) {
-    if (!file || !file.name.endsWith('.csv')) return;
-    csvFile = file;
-    fileName.textContent = file.name;
-    clearError('csv_drop_zone', 'err-csv-file');
-  }
+document.getElementById('week-prev-btn').addEventListener('click', () => { currentWeekOffset--; scheduleLoadWeek(); });
+document.getElementById('week-next-btn').addEventListener('click', () => { currentWeekOffset++; scheduleLoadWeek(); });
 
-  dropZone.addEventListener('click', () => fileInput.click());
-
-  fetch('/latest_csv').then(async resp => {
-    if (!resp.ok) return;
-    const blob = await resp.blob();
-    const name = resp.headers.get('Content-Disposition')?.match(/filename="?([^"]+)"?/)?.[1] || 'latest.csv';
-    setCsvFile(new File([blob], name, { type: 'text/csv' }));
-  }).catch(() => {});
-  fileInput.addEventListener('change', () => setCsvFile(fileInput.files[0]));
-
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-  dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
-  dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropZone.classList.remove('drag-over');
-    setCsvFile(e.dataTransfer.files[0]);
-  });
-}
-
-/* ── Theme ────────────────────────────────────────────────────────────────── */
+/* ── Theme Toggle ─────────────────────────────────────────────────────────── */
 
 const sunIcon  = document.getElementById('theme-icon-sun');
 const moonIcon = document.getElementById('theme-icon-moon');
@@ -139,192 +123,157 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
   localStorage.setItem('theme', next);
 });
 
-/* ── Date tabs ────────────────────────────────────────────────────────────── */
+/* ── Load Week ────────────────────────────────────────────────────────────── */
 
-document.querySelectorAll('.tab').forEach(btn => {
-  btn.addEventListener('click', () => _setTab(btn.dataset.tab));
-});
-
-/* ── Live clear errors ────────────────────────────────────────────────────── */
-
-[
-  ['tustena_api_key',       'input',  'err-tustena-api-key'],
-  ['float_api_key', 'input',  'err-float-api-key'],
-  ['ical_url',      'input',  'err-ical-url'],
-  ['date',          'change', 'err-date'],
-  ['date_from',     'change', 'err-date-range'],
-  ['date_to',       'change', 'err-date-range'],
-].forEach(([id, ev, errId]) =>
-  document.getElementById(id)?.addEventListener(ev, () => clearError(id, errId))
-);
-
-const holidayModal     = document.getElementById('holiday-modal');
-const holidayOkBtn     = document.getElementById('holiday-ok-btn');
-const holidayCancelBtn = document.getElementById('holiday-cancel-btn');
-const skipHolidaysCb   = document.getElementById('skip_holidays');
-
-skipHolidaysCb.addEventListener('change', function () {
-  if (!this.checked) {
-    this.checked = true;
-    holidayModal.classList.add('open');
-    holidayModal.setAttribute('aria-hidden', 'false');
-  }
-});
-
-holidayCancelBtn.addEventListener('click', () => {
-  holidayModal.classList.remove('open');
-  holidayModal.setAttribute('aria-hidden', 'true');
-});
-
-holidayOkBtn.addEventListener('click', () => {
-  skipHolidaysCb.checked = false;
-  holidayModal.classList.remove('open');
-  holidayModal.setAttribute('aria-hidden', 'true');
-});
-
-/* ── Form validation ──────────────────────────────────────────────────────── */
-
-function validate() {
-  let ok = true;
-
-  const apiKey = document.getElementById('tustena_api_key').value.trim();
-  if (!apiKey) { showError('tustena_api_key', 'err-tustena-api-key'); ok = false; }
-  else clearError('tustena_api_key', 'err-tustena-api-key');
-
-  if (isCsvMode()) {
-    if (!csvFile) { showError('csv_drop_zone', 'err-csv-file'); ok = false; }
-    else clearError('csv_drop_zone', 'err-csv-file');
-  } else if (isIcalMode()) {
-    const icalEl = document.getElementById('ical_url');
-    if (!icalEl.value.trim()) { showError('ical_url', 'err-ical-url'); ok = false; }
-    else clearError('ical_url', 'err-ical-url');
-  } else {
-    const floatEl = document.getElementById('float_api_key');
-    if (floatEl) {
-      if (!floatEl.value.trim()) { showError('float_api_key', 'err-float-api-key'); ok = false; }
-      else clearError('float_api_key', 'err-float-api-key');
-    }
-  }
-
-  if (activeTab === 'all') {
-    // no date filter — all tasks
-  } else if (activeTab === 'single') {
-    const date = document.getElementById('date').value;
-    if (!date) { showError('date', 'err-date'); ok = false; }
-    else clearError('date', 'err-date');
-  } else {
-    const from = document.getElementById('date_from').value;
-    const to   = document.getElementById('date_to').value;
-    const rangeMsg = document.getElementById('err-date-range');
-    if (!from || !to) {
-      rangeMsg.textContent = 'Seleziona entrambe le date.';
-      showError('date_from', 'err-date-range');
-      showError('date_to',   'err-date-range');
-      ok = false;
-    } else if (from >= to) {
-      rangeMsg.textContent = 'La data di inizio deve essere precedente a quella di fine.';
-      showError('date_from', 'err-date-range');
-      showError('date_to',   'err-date-range');
-      ok = false;
-    } else {
-      rangeMsg.textContent = '';
-      clearError('date_from', 'err-date-range');
-      clearError('date_to',   'err-date-range');
-    }
-  }
-
-  return ok;
+function scheduleLoadWeek() {
+  const bounds = getWeekBoundaries(currentWeekOffset);
+  const df = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'short' });
+  document.getElementById('week-title').textContent = `${df.format(bounds.monday)} — ${df.format(bounds.sunday)}`;
+  clearTimeout(_loadWeekTimer);
+  _loadWeekTimer = setTimeout(() => loadWeek(), 300);
 }
 
-/* ── Submit → Preview ─────────────────────────────────────────────────────── */
+async function loadWeek() {
+  const bounds = getWeekBoundaries(currentWeekOffset);
+  const df = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'short' });
+  document.getElementById('week-title').textContent = `${df.format(bounds.monday)} — ${df.format(bounds.sunday)}`;
+  setLoadingState();
+  await fetchPreview(bounds);
+}
 
-document.getElementById('form').addEventListener('submit', async e => {
-  e.preventDefault();
-  if (!validate()) return;
+function setLoadingState() {
+  document.getElementById('voucher-list').innerHTML = `
+    <div class="loading-state" style="display:flex; flex-direction:column; align-items:center; padding:3rem 0; color:var(--text-muted); gap: 1rem;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="spinner" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+      </svg>
+      <span>Recupero allocazioni in corso...</span>
+    </div>
+  `;
+}
 
-  lastTustenaApiKey = document.getElementById('tustena_api_key').value.trim();
-  lastFloatICalUrl = document.getElementById('ical_url').value.trim();
+function setListError(msg) {
+  document.getElementById('voucher-list').innerHTML = `<div class="form-error" style="display:block">${msg}</div>`;
+}
 
-  const btn = document.getElementById('preview-btn');
-  btn.disabled = true;
-  btn.textContent = 'Caricamento…';
-  document.getElementById('form-error').style.display = 'none';
+async function fetchPreview(bounds) {
+  const tk   = document.getElementById('tustena_api_key').value.trim();
+  const ic   = document.getElementById('ical_url').value.trim();
+  const skip = document.getElementById('skip_holidays').checked;
+  const cm   = document.getElementById('company_mapping')?.value.trim() || '{}';
+  const sm   = document.getElementById('service_mapping')?.value.trim() || '{}';
 
-  let fetchUrl, fetchInit;
+  if (!ic) return setListError('URL iCal mancante nelle impostazioni.');
 
-  if (isCsvMode()) {
-    const fd = new FormData();
-    fd.append('tustena_api_key', lastTustenaApiKey);
-    fd.append('csv_file', csvFile);
-    if (activeTab === 'single') {
-      fd.append('date', document.getElementById('date').value);
-    } else if (activeTab === 'range') {
-      fd.append('date_from', document.getElementById('date_from').value);
-      fd.append('date_to',   document.getElementById('date_to').value);
-    }
-    fetchUrl  = '/preview_csv';
-    fetchInit = { method: 'POST', body: fd };
-  } else if (isIcalMode()) {
-    const body = {
-      tustena_api_key: lastTustenaApiKey,
-      ical_url: lastFloatICalUrl,
-      skip_holidays: document.getElementById('skip_holidays').checked,
-    };
-    if (activeTab === 'single') {
-      body.date = document.getElementById('date').value;
-    } else if (activeTab === 'range') {
-      body.date_from = document.getElementById('date_from').value;
-      body.date_to   = document.getElementById('date_to').value;
-    }
-    fetchUrl  = '/preview_ical';
-    fetchInit = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
-  } else {
-    const body = { tustena_api_key: lastTustenaApiKey };
-    const floatEl = document.getElementById('float_api_key');
-    if (floatEl) body.float_api_key = lastFloatApiKey = floatEl.value.trim();
-    if (activeTab === 'single') {
-      body.date = document.getElementById('date').value;
-    } else {
-      body.date_from = document.getElementById('date_from').value;
-      body.date_to   = document.getElementById('date_to').value;
-    }
-    fetchUrl  = '/preview';
-    fetchInit = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
-  }
+  if (_previewAbortCtrl) _previewAbortCtrl.abort();
+  _previewAbortCtrl = new AbortController();
+  const signal = _previewAbortCtrl.signal;
 
   try {
-    const resp = await fetch(fetchUrl, fetchInit);
+    const resp = await fetch('/preview_ical', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tustena_api_key: tk, ical_url: ic, skip_holidays: skip, date_from: bounds.start, date_to: bounds.end, company_mapping: cm, service_mapping: sm }),
+      signal,
+    });
     const text = await resp.text();
     let json;
-    try { json = JSON.parse(text); } catch { showFormError(text); return; }
-
-    if (!resp.ok) {
-      const msg = resp.status < 500 ? (json.error || 'Errore durante il caricamento.') : 'Si è verificato un errore.';
-      showFormError(msg); return;
-    }
-
+    try { json = JSON.parse(text); } catch { return setListError(text); }
+    if (!resp.ok) return setListError(resp.status < 500 ? (json.error || 'Errore') : 'Si è verificato un errore.');
     renderPreview(json.allocations);
   } catch (err) {
-    showFormError('Errore di rete: ' + err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Anteprima →';
+    if (err.name === 'AbortError') return;
+    setListError('Errore di rete: ' + err.message);
   }
+}
+
+/* ── JSON Mapping Fields ─────────────────────────────────────────────────── */
+
+function _prettyJson(raw) {
+  if (!raw || !raw.trim()) return '';
+  try { return JSON.stringify(JSON.parse(raw), null, 2); } catch(e) { return raw; }
+}
+
+function _validateJsonField(el) {
+  const errId = { company_mapping: 'err-company-mapping', service_mapping: 'err-service-mapping' }[el.id];
+  const errEl = errId ? document.getElementById(errId) : null;
+  const val   = el.value.trim();
+  if (!val) {
+    el.classList.remove('input-error');
+    if (errEl) errEl.classList.remove('visible');
+    return true;
+  }
+  try {
+    JSON.parse(val);
+    el.classList.remove('input-error');
+    if (errEl) errEl.classList.remove('visible');
+    return true;
+  } catch(e) {
+    el.classList.add('input-error');
+    if (errEl) errEl.classList.add('visible');
+    return false;
+  }
+}
+
+/* ── Save Settings ────────────────────────────────────────────────────────── */
+
+document.getElementById('settings-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const tustenaEl = document.getElementById('tustena_api_key');
+  const icalEl    = document.getElementById('ical_url');
+  const companyEl = document.getElementById('company_mapping');
+  const serviceEl = document.getElementById('service_mapping');
+  let valid = true;
+
+  if (!_validateJsonField(companyEl)) valid = false;
+  if (!_validateJsonField(serviceEl)) valid = false;
+
+  if (!tustenaEl.value.trim()) {
+    tustenaEl.classList.add('input-error');
+    document.getElementById('err-tustena-api-key')?.classList.add('visible');
+    valid = false;
+  } else {
+    tustenaEl.classList.remove('input-error');
+    document.getElementById('err-tustena-api-key')?.classList.remove('visible');
+  }
+
+  if (!icalEl.value.trim()) {
+    icalEl.classList.add('input-error');
+    document.getElementById('err-ical-url')?.classList.add('visible');
+    valid = false;
+  } else {
+    icalEl.classList.remove('input-error');
+    document.getElementById('err-ical-url')?.classList.remove('visible');
+  }
+
+  if (!valid) return;
+
+  localStorage.setItem('tustena_api_key', tustenaEl.value.trim());
+  localStorage.setItem('ical_url', icalEl.value.trim());
+  localStorage.setItem('skip_holidays', document.getElementById('skip_holidays').checked);
+  localStorage.setItem('company_mapping', companyEl.value.trim());
+  localStorage.setItem('service_mapping', serviceEl.value.trim());
+
+  showMainView();
 });
 
-/* ── Preview ──────────────────────────────────────────────────────────────── */
+/* ── Render ───────────────────────────────────────────────────────────────── */
 
 function renderPreview(allocations) {
   previewData = allocations;
+  const list  = document.getElementById('voucher-list');
 
-  // Group by date, keeping original previewData index
+  if (!allocations || allocations.length === 0) {
+    list.innerHTML = `<div style="text-align:center; padding: 2rem; color: var(--text-muted);">Nessuna allocazione trovata per il periodo.</div>`;
+    return;
+  }
+
   const byDate = {};
   allocations.forEach((t, i) => {
     if (!byDate[t.start_date]) byDate[t.start_date] = [];
     byDate[t.start_date].push({ t, i });
   });
 
-  // Cascade times: first task of each day starts at 09:00
   const timeMap = {};
   Object.keys(byDate).sort().forEach(date => {
     let cursor = 9 * 60;
@@ -335,8 +284,6 @@ function renderPreview(allocations) {
     });
   });
 
-  // Render rows
-  const list = document.getElementById('voucher-list');
   list.innerHTML = '';
   Object.keys(byDate).sort().forEach(date => {
     const sep = document.createElement('div');
@@ -351,12 +298,62 @@ function renderPreview(allocations) {
 
       if (t.error) {
         row.className = 'voucher-row voucher-error';
+        let errorAction = `<div class="voucher-error-msg">${t.error}</div>`;
+
+        if (t.error_type === 'company') {
+          const q = t.error_query ? t.error_query.replace(/"/g, '&quot;') : '';
+          errorAction = `
+            <div class="voucher-error-action" data-type="company" data-query="${q}">
+              <div class="mi-hint">Il nome su Float non corrisponde a nessun cliente su Tustena. Cerca il nome corretto:</div>
+              <div class="mi-row">
+                <span class="mi-name" title="${q}">${q}</span>
+                <span class="mi-arrow">→</span>
+                <div class="mi-search-wrap">
+                  <div class="mi-input-row">
+                    <input type="text" class="inline-search-input mi-input" placeholder="Cerca su Tustena…" value="${q}" />
+                    <button type="button" class="btn-inline-search mi-btn">Cerca</button>
+                  </div>
+                  <div class="mi-results-container" style="display:none">
+                    <ul class="inline-search-results mi-results"></ul>
+                    <div class="mi-mappa-row">
+                      <button type="button" class="btn-mappa-confirm mi-mappa-btn" disabled>Mappa</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>`;
+        } else if (t.error_type === 'service') {
+          const q  = t.error_query   ? t.error_query.replace(/"/g, '&quot;')   : '';
+          const co = t.company_name  ? t.company_name.replace(/"/g, '&quot;')  : '';
+          const ct = t.contract_code ? t.contract_code.replace(/"/g, '&quot;') : '';
+          errorAction = `
+            <div class="voucher-error-action" data-type="service" data-query="${q}" data-company="${co}" data-contract="${ct}">
+              <div class="mi-hint">Il servizio su Float non corrisponde a nessun servizio Tustena del contratto <strong>${ct}</strong>. Seleziona il servizio corretto:</div>
+              <div class="mi-row">
+                <span class="mi-name" title="${q}">${q}</span>
+                <span class="mi-arrow">→</span>
+                <div class="mi-search-wrap">
+                  <div class="mi-input-row">
+                    <button type="button" class="btn-inline-search mi-btn">Carica servizi</button>
+                  </div>
+                  <div class="mi-results-container" style="display:none">
+                    <ul class="inline-search-results mi-results"></ul>
+                    <div class="mi-mappa-row">
+                      <button type="button" class="btn-mappa-confirm mi-mappa-btn" disabled>Mappa</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>`;
+        }
+
         row.innerHTML = `
-          <div class="voucher-meta">
+          <div class="voucher-meta" style="flex:unset; width:100%; margin-bottom:0.5rem">
             <div class="vm-primary" title="${t.project_name}">${t.project_name}</div>
             <div class="vm-secondary" title="${t.client_name}">${t.client_name}</div>
           </div>
-          <div class="voucher-error-msg">${t.error}</div>`;
+          ${errorAction}`;
+
       } else if (t.exists) {
         row.className = 'voucher-row voucher-exists';
         row.innerHTML = `
@@ -365,6 +362,7 @@ function renderPreview(allocations) {
             <div class="vm-secondary" title="${t.client_name}">${t.client_name}</div>
           </div>
           <span class="voucher-badge-exists">Già presente</span>`;
+
       } else {
         row.className = 'voucher-row';
         row.innerHTML = `
@@ -386,55 +384,30 @@ function renderPreview(allocations) {
                 <span class="voucher-duration"></span>
                 <span class="vf-expected">Previsto: ${t.hours}h</span>
               </div>
+              <div class="vf-action">
+                <button class="btn btn-run-row" type="button" data-idx="${i}">Crea</button>
+              </div>
             </div>
           </div>
           <textarea class="voucher-description" placeholder="Contenuto Del Rapportino…" rows="1">${t.notes || ''}</textarea>`;
-        row.querySelectorAll('input[type="time"]').forEach(inp =>
-          inp.addEventListener('input', () => { updateDuration(row, t.hours); updateExecuteState(); })
-        );
-        row.querySelector('.voucher-description').addEventListener('input', updateExecuteState);
+
+        row.querySelectorAll('input[type="time"]').forEach(inp => {
+          inp.addEventListener('input',  () => updateDuration(row, t.hours));
+          inp.addEventListener('change', () => updateDuration(row, t.hours));
+        });
         updateDuration(row, t.hours);
       }
-
       list.appendChild(row);
     });
   });
 
-  const errorCount  = allocations.filter(t => t.error).length;
   const existsCount = allocations.filter(t => t.exists).length;
-  const okCount     = allocations.length - errorCount - existsCount;
-  document.getElementById('step2-count').textContent = `${okCount} voucher da creare`;
-  const errEl = document.getElementById('step2-errors');
-  if (errorCount > 0) {
-    errEl.textContent = `${errorCount} con errore`;
-    errEl.style.display = '';
-  } else {
-    errEl.style.display = 'none';
-  }
-  const existsEl = document.getElementById('step2-exists');
-  if (existsCount > 0) {
-    existsEl.textContent = `${existsCount} già presenti`;
-    existsEl.style.display = '';
-  } else {
-    existsEl.style.display = 'none';
-  }
-
-  const toggleBtn = document.getElementById('toggle-exists-btn');
+  const toggleBtn   = document.getElementById('toggle-exists-btn');
   toggleBtn.style.display = existsCount > 0 ? '' : 'none';
   toggleBtn.dataset.hidden = 'true';
-  toggleBtn.textContent = 'Mostra già presenti';
-
-  // hide existing rows and empty date seps by default
+  toggleBtn.textContent = `Mostra ${existsCount} già present${existsCount === 1 ? 'e' : 'i'}`;
   document.querySelectorAll('.voucher-exists').forEach(r => r.style.display = 'none');
   updateDateSeparators();
-
-  document.getElementById('step1').style.display              = 'none';
-  document.getElementById('step2').style.display              = 'block';
-  document.getElementById('warning-banner-full').style.display    = 'none';
-  document.getElementById('warning-banner-compact').style.display = '';
-  document.getElementById('holiday-warning').style.display = (isIcalMode() && !skipHolidaysCb.checked) ? '' : 'none';
-  updateExecuteState();
-  history.pushState({ step: 'preview' }, '', '#preview');
 }
 
 function updateDateSeparators() {
@@ -450,53 +423,29 @@ function updateDateSeparators() {
 }
 
 document.getElementById('toggle-exists-btn').addEventListener('click', () => {
-  const btn = document.getElementById('toggle-exists-btn');
+  const btn    = document.getElementById('toggle-exists-btn');
   const hiding = btn.dataset.hidden === 'false';
-  document.querySelectorAll('.voucher-exists').forEach(row => {
-    row.style.display = hiding ? 'none' : '';
-  });
+  document.querySelectorAll('.voucher-exists').forEach(row => { row.style.display = hiding ? 'none' : ''; });
   updateDateSeparators();
   btn.dataset.hidden = hiding ? 'true' : 'false';
-  btn.textContent = hiding ? 'Mostra già presenti' : 'Nascondi già presenti';
+  const cnt = document.querySelectorAll('.voucher-exists').length;
+  btn.textContent = hiding ? `Mostra ${cnt} già present${cnt === 1 ? 'e' : 'i'}` : 'Nascondi già presenti';
 });
-
-function updateExecuteState() {
-  const errors = [];
-  document.querySelectorAll('.voucher-row').forEach(row => {
-    const durEl = row.querySelector('.voucher-duration');
-    if (durEl?.classList.contains('voucher-hours--diff')) {
-      const name = row.querySelector('.vm-primary')?.textContent || '';
-      errors.push(durEl.textContent + (name ? ` (${name})` : ''));
-    }
-  });
-
-  const btn     = document.getElementById('execute-btn');
-  const warning = document.getElementById('execute-warning');
-
-  const hasErrors  = document.querySelectorAll('.voucher-row.voucher-error').length > 0;
-
-  const descEls = [...document.querySelectorAll('.voucher-row:not(.voucher-exists):not(.voucher-error) .voucher-description')];
-  descEls.forEach(el => el.classList.toggle('input-error', !el.value.trim()));
-  const missingDesc = descEls.some(el => !el.value.trim());
-
-  btn.disabled = errors.length > 0 || hasErrors || missingDesc || previewData.length === 0;
-  if (errors.length > 0 || hasErrors || missingDesc) {
-    warning.querySelector('.execute-warning-tip').textContent = 'Controlla i voucher prima di procedere.';
-    warning.style.display = 'inline-flex';
-  } else {
-    warning.style.display = 'none';
-  }
-}
 
 function updateDuration(row, expectedHours) {
   const startInput = row.querySelector('[data-field="start"]');
   const endInput   = row.querySelector('[data-field="end"]');
   const durEl      = row.querySelector('.voucher-duration');
+  const btn        = row.querySelector('.btn-run-row');
 
   const startVal = startInput.value;
   const endVal   = endInput.value;
 
-  if (!startVal || !endVal) { durEl.textContent = '—'; return; }
+  if (!startVal || !endVal) {
+    durEl.textContent = '—';
+    if (btn) { btn.disabled = true; btn.title = 'Inserisci orario di inizio e fine'; }
+    return;
+  }
 
   const [sh, sm] = startVal.split(':').map(Number);
   const [eh, em] = endVal.split(':').map(Number);
@@ -508,6 +457,7 @@ function updateDuration(row, expectedHours) {
     endInput.classList.add('input-error');
     durEl.textContent = 'Fine ≤ Inizio';
     durEl.className = 'voucher-duration voucher-hours--diff';
+    if (btn) { btn.disabled = true; btn.title = 'Orario non valido: fine ≤ inizio'; }
     return;
   }
 
@@ -516,100 +466,173 @@ function updateDuration(row, expectedHours) {
 
   const actualH = (actualMins / 60).toFixed(1).replace('.0', '');
   durEl.textContent = `Durata: ${actualH}h`;
-  durEl.className = actualMins !== expectedMins ? 'voucher-duration voucher-hours--diff' : 'voucher-duration';
-}
+  const hasDurationError = actualMins !== expectedMins;
+  durEl.className = hasDurationError ? 'voucher-duration voucher-hours--diff' : 'voucher-duration';
 
-function _goBackUI() {
-  document.getElementById('step2').style.display              = 'none';
-  document.getElementById('step1').style.display              = 'block';
-  document.getElementById('output-card').style.display        = 'none';
-  document.getElementById('warning-banner-full').style.display    = '';
-  document.getElementById('warning-banner-compact').style.display = 'none';
-  document.getElementById('log').innerHTML = '';
-}
-
-function goBack() {
-  _goBackUI();
-  if (location.hash === '#preview') history.back();
-}
-
-window.addEventListener('popstate', () => {
-  if (document.getElementById('step2').style.display !== 'none') _goBackUI();
-});
-
-document.getElementById('back-btn').addEventListener('click', goBack);
-document.getElementById('warning-back-btn').addEventListener('click', goBack);
-
-/* ── Warning banner toggle ────────────────────────────────────────────────── */
-
-document.getElementById('warning-toggle').addEventListener('click', () => {
-  const details = document.getElementById('warning-details');
-  const chevron = document.querySelector('.warning-chevron');
-  const expanded = details.style.display !== 'none';
-  details.style.display = expanded ? 'none' : '';
-  chevron.classList.toggle('warning-chevron--open', !expanded);
-});
-
-/* ── Company search ───────────────────────────────────────────────────────── */
-
-async function searchCompany() {
-  const query      = document.getElementById('company-search-input').value.trim();
-  const tustenaKey = document.getElementById('tustena_api_key').value.trim();
-  const results    = document.getElementById('company-search-results');
-  if (!query) return;
-
-  results.innerHTML = '<li class="company-search-loading">Ricerca in corso…</li>';
-  try {
-    const resp = await fetch(`/search_company?tustena_api_key=${encodeURIComponent(tustenaKey)}&q=${encodeURIComponent(query)}`);
-    const json = await resp.json();
-    if (json.error) {
-      results.innerHTML = `<li class="company-search-error">${json.error}</li>`;
-    } else if (!json.companies.length) {
-      results.innerHTML = '<li class="company-search-empty">Nessun risultato.</li>';
-    } else {
-      results.innerHTML = json.companies.map(name => `<li>${name}</li>`).join('');
-    }
-  } catch {
-    results.innerHTML = '<li class="company-search-error">Errore di rete.</li>';
+  if (btn) {
+    const descEl   = row.querySelector('.voucher-description');
+    const descEmpty = !descEl || !descEl.value.trim();
+    if (descEl) descEl.classList.toggle('input-error', descEmpty);
+    btn.disabled = hasDurationError || descEmpty;
+    if (hasDurationError) btn.title = 'La durata non corrisponde a quella prevista da Float';
+    else if (descEmpty)   btn.title = 'Inserisci il contenuto del rapportino';
+    else                  btn.title = 'Crea voucher';
   }
 }
 
-document.getElementById('company-search-btn').addEventListener('click', searchCompany);
-document.getElementById('company-search-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') searchCompany();
+document.getElementById('voucher-list').addEventListener('input', e => {
+  if (e.target.classList.contains('voucher-description')) {
+    const row = e.target.closest('.voucher-row');
+    updateDuration(row, previewData[row.dataset.idx].hours);
+  }
 });
 
-async function searchServices() {
-  const company    = document.getElementById('service-company-input').value.trim();
-  const contract   = document.getElementById('service-contract-input').value.trim();
-  const tustenaKey = document.getElementById('tustena_api_key').value.trim();
-  const results    = document.getElementById('service-search-results');
-  if (!company || !contract) return;
+/* ── Run Row Execution ────────────────────────────────────────────────────── */
 
-  results.innerHTML = '<li class="company-search-loading">Ricerca in corso…</li>';
+document.getElementById('voucher-list').addEventListener('click', async e => {
+  const btn = e.target.closest('.btn-run-row');
+  if (!btn) return;
+
+  const idx    = btn.dataset.idx;
+  const row    = btn.closest('.voucher-row');
+  const t      = previewData[idx];
+  const descEl  = row.querySelector('.voucher-description');
+  const startEl = row.querySelector('[data-field="start"]');
+  const endEl   = row.querySelector('[data-field="end"]');
+
+  const desc = descEl.value.trim();
+  if (!desc) { descEl.classList.add('input-error'); return; }
+  descEl.classList.remove('input-error');
+
+  btn.disabled = true;
+  btn.textContent = 'Creazione...';
+
+  const tk = document.getElementById('tustena_api_key').value.trim();
+
   try {
-    const resp = await fetch(`/search_services?tustena_api_key=${encodeURIComponent(tustenaKey)}&company=${encodeURIComponent(company)}&contract=${encodeURIComponent(contract)}`);
-    const json = await resp.json();
-    if (json.error) {
-      results.innerHTML = `<li class="company-search-error">${json.error}</li>`;
-    } else if (!json.services.length) {
-      results.innerHTML = '<li class="company-search-empty">Nessun risultato.</li>';
+    const resp = await fetch('/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tustena_api_key: tk,
+        tasks: [{ ...t, start_time: startEl.value, end_time: endEl.value, description: desc }],
+      }),
+    });
+
+    const text = await resp.text();
+    let json;
+    try { json = JSON.parse(text); } catch { throw new Error(text); }
+    if (!resp.ok) throw new Error(json.error || 'Errore HTTP');
+
+    const r = json.results[0];
+    if (r.ok) {
+      btn.textContent = 'Creato ✓';
+      btn.style.background = 'var(--success)';
+      startEl.disabled = true;
+      endEl.disabled   = true;
+      descEl.disabled  = true;
     } else {
-      results.innerHTML = json.services.map(name => `<li>${name}</li>`).join('');
+      throw new Error(r.error);
     }
-  } catch {
-    results.innerHTML = '<li class="company-search-error">Errore di rete.</li>';
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Riprova';
+    btn.style.background = 'var(--error)';
+    alert(`Errore: ${err.message}`);
   }
-}
+});
 
-document.getElementById('service-search-btn').addEventListener('click', searchServices);
-[document.getElementById('service-company-input'), document.getElementById('service-contract-input')]
-  .forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') searchServices(); }));
+/* ── Inline Mapping Resolution ────────────────────────────────────────────── */
 
-/* ── Execute ──────────────────────────────────────────────────────────────── */
+document.getElementById('voucher-list').addEventListener('click', async e => {
+  const btn = e.target.closest('.btn-inline-search');
+  if (btn) {
+    const actionEl   = btn.closest('.voucher-error-action');
+    const inputEl    = actionEl.querySelector('.inline-search-input');
+    const results    = actionEl.querySelector('.inline-search-results');
+    const container  = actionEl.querySelector('.mi-results-container');
+    const mappaBtn   = actionEl.querySelector('.btn-mappa-confirm');
+    const type       = actionEl.dataset.type;
+    const query      = inputEl ? inputEl.value.trim() : '';
+    const tustenaKey = document.getElementById('tustena_api_key').value.trim();
+
+    if (type === 'company' && !query) return;
+
+    results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Ricerca in corso…</li>';
+    container.style.display = '';
+    if (mappaBtn) mappaBtn.disabled = true;
+
+    try {
+      let resp;
+      if (type === 'company') {
+        resp = await fetch(`/search_company?tustena_api_key=${encodeURIComponent(tustenaKey)}&q=${encodeURIComponent(query)}`);
+      } else {
+        const company        = actionEl.dataset.company;
+        const contract       = actionEl.dataset.contract;
+        const companyMapping = localStorage.getItem('company_mapping') || '';
+        resp = await fetch(`/search_services?tustena_api_key=${encodeURIComponent(tustenaKey)}&company=${encodeURIComponent(company)}&contract=${encodeURIComponent(contract)}&company_mapping=${encodeURIComponent(companyMapping)}`);
+      }
+      const json = await resp.json();
+
+      if (json.error) {
+        results.innerHTML = `<li style="padding:0.35rem 0.6rem;color:var(--error);list-style:none;font-size:0.84rem">${json.error}</li>`;
+      } else if (type === 'company' && !json.companies.length) {
+        results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Nessun risultato.</li>';
+      } else if (type === 'service' && !json.services.length) {
+        results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Nessun risultato.</li>';
+      } else {
+        const items = type === 'company' ? json.companies : json.services;
+        results.innerHTML = items.map(name => `<li class="inline-result-item" data-name="${name.replace(/"/g,'&quot;')}">${name}</li>`).join('');
+      }
+    } catch {
+      results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--error);list-style:none;font-size:0.84rem">Errore di rete.</li>';
+    }
+    return;
+  }
+
+  const li = e.target.closest('.inline-result-item');
+  if (li) {
+    const actionEl = li.closest('.voucher-error-action');
+    const mappaBtn = actionEl.querySelector('.btn-mappa-confirm');
+    actionEl.querySelectorAll('.inline-result-item').forEach(el => el.classList.remove('selected'));
+    li.classList.add('selected');
+    if (mappaBtn) mappaBtn.disabled = false;
+    return;
+  }
+
+  const mappaBtn = e.target.closest('.btn-mappa-confirm');
+  if (mappaBtn && !mappaBtn.disabled) {
+    const actionEl = mappaBtn.closest('.voucher-error-action');
+    const selected = actionEl.querySelector('.inline-result-item.selected');
+    if (!selected) return;
+
+    const type       = actionEl.dataset.type;
+    const errorQ     = actionEl.dataset.query;
+    const mapped     = selected.dataset.name;
+    const storageKey = type === 'company' ? 'company_mapping' : 'service_mapping';
+
+    let map = {};
+    try { const raw = localStorage.getItem(storageKey); if (raw) map = JSON.parse(raw); } catch(err) {}
+    map[errorQ] = mapped;
+    const newJson = JSON.stringify(map, null, 2);
+    localStorage.setItem(storageKey, newJson);
+    const field = document.getElementById(storageKey);
+    if (field) field.value = newJson;
+    loadWeek();
+  }
+});
+
+document.getElementById('voucher-list').addEventListener('keydown', e => {
+  if (e.target.classList.contains('inline-search-input') && e.key === 'Enter') {
+    e.preventDefault();
+    e.target.closest('.voucher-error-action').querySelector('.btn-inline-search')?.click();
+  }
+});
+
+/* ── Help Modal ───────────────────────────────────────────────────────────── */
 
 const helpModal = document.getElementById('help-modal');
-const helpBtn = document.getElementById('help-btn');
+const helpBtn   = document.getElementById('help-btn');
 
 if (!localStorage.getItem('helpSeen')) {
   helpBtn.classList.add('help-btn-blink');
@@ -621,102 +644,33 @@ helpBtn.addEventListener('click', () => {
   helpBtn.classList.remove('help-btn-blink');
   localStorage.setItem('helpSeen', '1');
 });
-document.getElementById('help-ok-btn').addEventListener('click', () => {
+
+document.getElementById('help-ok-btn')?.addEventListener('click', () => {
   helpModal.classList.remove('open');
   helpModal.setAttribute('aria-hidden', 'true');
 });
-helpModal.addEventListener('click', e => {
-  if (e.target === helpModal) {
-    helpModal.classList.remove('open');
-    helpModal.setAttribute('aria-hidden', 'true');
+
+/* ── Holiday Modal ────────────────────────────────────────────────────────── */
+
+const holidayModal     = document.getElementById('holiday-modal');
+const skipHolidaysCb   = document.getElementById('skip_holidays');
+
+skipHolidaysCb.addEventListener('change', function() {
+  if (!this.checked) {
+    this.checked = true;
+    holidayModal.classList.add('open');
+    holidayModal.setAttribute('aria-hidden', 'false');
   }
 });
 
-const confirmModal     = document.getElementById('confirm-modal');
-const confirmOkBtn     = document.getElementById('confirm-ok-btn');
-const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
-
-document.getElementById('execute-btn').addEventListener('click', () => {
-  if (localStorage.getItem('confirmSkip')) {
-    confirmOkBtn.click();
-    return;
-  }
-  confirmModal.classList.add('open');
-  confirmModal.setAttribute('aria-hidden', 'false');
+document.getElementById('holiday-cancel-btn')?.addEventListener('click', () => {
+  holidayModal.classList.remove('open');
+  holidayModal.setAttribute('aria-hidden', 'true');
 });
 
-confirmCancelBtn.addEventListener('click', () => {
-  confirmModal.classList.remove('open');
-  confirmModal.setAttribute('aria-hidden', 'true');
-});
-
-confirmOkBtn.addEventListener('click', async () => {
-  if (document.getElementById('confirm-skip-checkbox').checked) {
-    localStorage.setItem('confirmSkip', '1');
-  }
-  confirmModal.classList.remove('open');
-  confirmModal.setAttribute('aria-hidden', 'true');
-
-  const tasks = previewData.reduce((acc, t, i) => {
-    if (t.error || t.exists) return acc;
-    const row = document.querySelector(`.voucher-row[data-idx="${i}"]`);
-    if (!row) return acc;
-    acc.push({
-      ...t,
-      start_time:  row.querySelector('[data-field="start"]').value,
-      end_time:    row.querySelector('[data-field="end"]').value,
-      description: row.querySelector('.voucher-description').value,
-    });
-    return acc;
-  }, []);
-
-  const btn        = document.getElementById('execute-btn');
-  const outputCard = document.getElementById('output-card');
-  const log        = document.getElementById('log');
-  const statusDot  = document.getElementById('status-dot');
-  const statusText = document.getElementById('status-text');
-
-  btn.disabled = true;
-  btn.textContent = 'Creazione…';
-  outputCard.style.display = 'block';
-  log.innerHTML = '';
-  statusDot.className = 'status-dot running';
-  statusText.textContent = 'In corso…';
-
-  try {
-    const resp = await fetch('/run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tustena_api_key: lastTustenaApiKey, float_api_key: lastFloatApiKey, tasks }),
-    });
-    const text = await resp.text();
-    let json;
-    try { json = JSON.parse(text); } catch { log.textContent = text; return; }
-
-    if (!resp.ok) {
-      statusDot.className = 'status-dot error';
-      statusText.textContent = 'Errore';
-      log.innerHTML = `<span class="line-err">${json.error}</span>`;
-      return;
-    }
-
-    const hasErrors = json.results.some(r => !r.ok);
-    json.results.forEach(r => {
-      const line = document.createElement('span');
-      line.className = r.ok ? 'line-ok' : 'line-err';
-      const d = r.date ? r.date.split('-').reverse().join('/') : r.date;
-      line.textContent = r.ok ? `✓ ${d} → ID ${r.id}\n` : `✗ ${d}: ${r.error}\n`;
-      log.appendChild(line);
-    });
-    statusDot.className = hasErrors ? 'status-dot error' : 'status-dot ok';
-    statusText.textContent = hasErrors ? 'Completato con errori' : 'Completato';
-    if (hasErrors) { btn.disabled = false; }
-  } catch (err) {
-    statusDot.className = 'status-dot error';
-    statusText.textContent = 'Errore';
-    log.innerHTML = `<span class="line-err">${err.message}</span>`;
-    btn.disabled = false;
-  } finally {
-    btn.textContent = 'Crea Voucher';
-  }
+document.getElementById('holiday-ok-btn')?.addEventListener('click', () => {
+  skipHolidaysCb.checked = false;
+  document.getElementById('holiday-warning').style.display = '';
+  holidayModal.classList.remove('open');
+  holidayModal.setAttribute('aria-hidden', 'true');
 });
