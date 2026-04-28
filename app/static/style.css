@@ -574,7 +574,6 @@ textarea.input-error {
 .voucher-row:hover { border-color: var(--primary); }
 
 .voucher-row.voucher-error {
-  opacity: 0.7;
   border-color: var(--error);
   background: rgba(244, 63, 94, 0.04);
 }
