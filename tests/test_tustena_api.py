@@ -145,7 +145,7 @@ def test_search_companies(mock_session):
     ])
     from tustena_api import tustena_search_companies
     result = tustena_search_companies("ACME", "key")
-    assert result == ["ACME S.P.A.", "ACME S.R.L."]
+    assert result == [{"id": 1, "name": "ACME S.P.A."}, {"id": 2, "name": "ACME S.R.L."}]
 
 
 # ── tustena_search_services ───────────────────────────────────────────────────
