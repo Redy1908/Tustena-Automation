@@ -49,22 +49,26 @@ def tustena_search_services(company_name: str, contract_code: str, api_key: str,
     return [s["catalogDescription"] for s in (services or [])]
 
 
-def tustena_search_companies(query: str, api_key: str) -> list[str]:
+def tustena_search_companies(query: str, api_key: str) -> list[dict]:
     companies = _post("Company/SearchByODataCriteria", api_key,
                       json={"filter": f"substringof('{query}',companyName)", "select": "id,companyName"})
-    return [c["companyName"] for c in (companies or [])]
+    return [{"id": c["id"], "name": c["companyName"]} for c in (companies or [])]
 
 
 def tustena_get_company_id(company_name: str, api_key: str, overrides: dict = None):
     mapping = overrides or {}
-    company_name = mapping.get(company_name, company_name)
+    mapped = mapping.get(company_name, company_name)
+    if isinstance(mapped, int):
+        return mapped
+    if isinstance(mapped, str) and mapped.lstrip("-").isdigit():
+        return int(mapped)
     companies = _post("Company/SearchByODataCriteria", api_key,
-                      json={"filter": f"substringof('{company_name}',companyName)", "select": "id,companyName"})
+                      json={"filter": f"substringof('{mapped}',companyName)", "select": "id,companyName"})
     if len(companies) == 1:
         return companies[0]["id"]
     elif len(companies) > 1:
-        raise ValueError(f"Trovati più match per '{company_name}': {[c['companyName'] for c in companies]}")
-    raise ValueError(f"Nessun match trovato per '{company_name}'")
+        raise ValueError(f"Trovati più match per '{mapped}': {[c['companyName'] for c in companies]}")
+    raise ValueError(f"Nessun match trovato per '{mapped}'")
 
 
 def tustena_get_contract_id(company_id: str, contract_code: str, api_key: str):

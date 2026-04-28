@@ -580,9 +580,16 @@ document.getElementById('voucher-list').addEventListener('click', async e => {
         results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Nessun risultato.</li>';
       } else if (type === 'service' && !json.services.length) {
         results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Nessun risultato.</li>';
+      } else if (type === 'company') {
+        const nameCounts = {};
+        json.companies.forEach(c => { nameCounts[c.name] = (nameCounts[c.name] || 0) + 1; });
+        results.innerHTML = json.companies.map(c => {
+          const isDup = nameCounts[c.name] > 1;
+          const label = isDup ? `${c.name} <span style="opacity:0.6;font-size:0.8em">#${c.id}</span>` : c.name;
+          return `<li class="inline-result-item" data-id="${c.id}" data-name="${c.name.replace(/"/g,'&quot;')}" data-dup="${isDup}">${label}</li>`;
+        }).join('');
       } else {
-        const items = type === 'company' ? json.companies : json.services;
-        results.innerHTML = items.map(name => `<li class="inline-result-item" data-name="${name.replace(/"/g,'&quot;')}">${name}</li>`).join('');
+        results.innerHTML = json.services.map(name => `<li class="inline-result-item" data-name="${name.replace(/"/g,'&quot;')}">${name}</li>`).join('');
       }
     } catch {
       results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--error);list-style:none;font-size:0.84rem">Errore di rete.</li>';
@@ -608,8 +615,10 @@ document.getElementById('voucher-list').addEventListener('click', async e => {
 
     const type       = actionEl.dataset.type;
     const errorQ     = actionEl.dataset.query;
-    const mapped     = selected.dataset.name;
     const storageKey = type === 'company' ? 'company_mapping' : 'service_mapping';
+    const mapped     = (type === 'company' && selected.dataset.dup === 'true')
+      ? parseInt(selected.dataset.id, 10)
+      : selected.dataset.name;
 
     let map = {};
     try { const raw = localStorage.getItem(storageKey); if (raw) map = JSON.parse(raw); } catch(err) {}

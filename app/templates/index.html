@@ -70,7 +70,7 @@
           Company Mapping (JSON)
           <span class="info-icon" tabindex="0" aria-label="Esempio mapping">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-            <span class="tooltip">Esempio: {"Float Name": "Tustena Name"}</span>
+            <span class="tooltip">{"Nome Float": "Nome Tustena"}<br>{"Nome Float": ID Tustena}</span>
           </span>
         </label>
         <textarea id="company_mapping" name="company_mapping" rows="3" placeholder='{"Nome Float": "Nome Tustena"}'></textarea>
@@ -168,6 +168,10 @@
     <div class="help-section">
       <h3>Creazione voucher</h3>
       <p>Clicca <strong>Crea</strong> sul singolo voucher per inviarlo a Tustena. L'operazione non può essere annullata: eventuali correzioni vanno effettuate direttamente su Tustena. Dopo la creazione ricordati di inviare il rapportino via mail da Tustena.</p>
+    </div>
+    <div class="help-section">
+      <h3>Aziende duplicate</h3>
+      <p>Se su Tustena esistono due aziende con lo stesso nome ma ID diversi, la ricerca per nome è ambigua e genera un errore. In questo caso, usa la ricerca inline: i risultati duplicati vengono mostrati con il loro <strong>#ID</strong> per poterli distinguere. Selezionando quello corretto, il mapping salva automaticamente l'ID numerico invece del nome. Puoi anche inserirlo manualmente nel <em>Company Mapping</em>: <code>{"Nome Float": 3672}</code>.</p>
     </div>
     <div class="modal-actions">
       <button type="button" class="btn" id="help-ok-btn">OK</button>
