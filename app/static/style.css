@@ -3,14 +3,14 @@
 /* ── Variables ────────────────────────────────────────────────────────────── */
 
 :root {
-  --bg:           #f5f5f7;
-  --card-bg:      #ffffff;
+  --bg:           #f2ece3;
+  --card-bg:      #fdf9f5;
   --text:         #1a1a2e;
   --text-muted:   #6b7280;
-  --border:       #e5e7eb;
-  --card-border:  #E2E8F0;
-  --input-bg:     #f9fafb;
-  --input-border: #d1d5db;
+  --border:       #e0d8cf;
+  --card-border:  #ddd5cc;
+  --input-bg:     #f8f4ef;
+  --input-border: #ccc4bb;
   --primary:      #6366f1;
   --primary-dark: #4f46e5;
   --error:        #f43f5e;
@@ -21,6 +21,9 @@
   --tooltip-bg:   #1E1B4B;
   --tooltip-text: #EEF2FF;
   --tooltip-bdr:  #3730A3;
+  --radio-border: #9c968f;
+  --results-bg:   #efe9e2;
+  --results-bdr:  #c8bfb5;
 }
 
 [data-theme="dark"] {
@@ -33,6 +36,9 @@
   --input-bg:     #12122a;
   --input-border: #3a3a55;
   --shadow:       0 1px 3px rgba(0,0,0,.4);
+  --radio-border: #4a4a6a;
+  --results-bg:   #12122a;
+  --results-bdr:  #3a3a55;
 }
 
 /* ── Reset & base ─────────────────────────────────────────────────────────── */
@@ -347,9 +353,9 @@ textarea.input-error {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.35rem 0.6rem;
+  padding: 0.3rem 0.6rem;
   cursor: pointer;
-  border-radius: 5px;
+  border-radius: 8px;
   font-size: 0.84rem;
   transition: background 0.12s;
   list-style: none;
@@ -359,7 +365,7 @@ textarea.input-error {
   content: '';
   width: 14px;
   height: 14px;
-  border: 1.5px solid var(--border);
+  border: 1.5px solid var(--radio-border);
   border-radius: 50%;
   flex-shrink: 0;
   transition: border-color 0.12s, background 0.12s;
@@ -425,8 +431,7 @@ textarea.input-error {
 }
 
 .mi-btn {
-  flex-shrink: 0;
-  padding: 0.3rem 0.75rem;
+  padding: 0.3rem 0;
   font-size: 0.82rem;
   font-family: inherit;
   border: 1px solid var(--primary);
@@ -435,43 +440,37 @@ textarea.input-error {
   color: #fff;
   cursor: pointer;
   transition: opacity 0.15s;
+  width: 100%;
 }
 
 .mi-btn:hover { opacity: 0.85; }
 
 .mi-search-wrap {
+  display: grid;
+  grid-template-columns: 1fr 5.5rem;
+  gap: 0.4rem;
   flex: 1;
   min-width: 0;
 }
 
-.mi-input-row {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.mi-results-container {
-  margin-top: 0.5rem;
+.mi-search-wrap--load .btn-inline-search {
+  grid-column: 1 / -1;
+  width: auto;
 }
 
 .mi-results {
   max-height: 10rem;
   overflow-y: auto;
-  border: 1px solid var(--border);
+  border: 1px solid var(--input-border);
   border-radius: 8px;
   background: var(--input-bg);
-  padding: 0.25rem;
+  padding: 0;
   list-style: none;
   margin: 0;
 }
 
-.mi-mappa-row {
-  margin-top: 0.4rem;
-  display: flex;
-  justify-content: flex-end;
-}
-
 .mi-mappa-btn {
-  padding: 0.3rem 1rem;
+  padding: 0.3rem 0;
   font-size: 0.82rem;
   font-family: inherit;
   border: 1px solid var(--primary);
@@ -480,6 +479,8 @@ textarea.input-error {
   color: #fff;
   cursor: pointer;
   transition: opacity 0.15s;
+  align-self: start;
+  width: 100%;
 }
 
 .mi-mappa-btn:disabled {

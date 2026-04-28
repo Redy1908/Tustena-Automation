@@ -309,16 +309,10 @@ function renderPreview(allocations) {
                 <span class="mi-name" title="${q}">${q}</span>
                 <span class="mi-arrow">→</span>
                 <div class="mi-search-wrap">
-                  <div class="mi-input-row">
-                    <input type="text" class="inline-search-input mi-input" placeholder="Cerca su Tustena…" value="${q}" />
-                    <button type="button" class="btn-inline-search mi-btn">Cerca</button>
-                  </div>
-                  <div class="mi-results-container" style="display:none">
-                    <ul class="inline-search-results mi-results"></ul>
-                    <div class="mi-mappa-row">
-                      <button type="button" class="btn-mappa-confirm mi-mappa-btn" disabled>Mappa</button>
-                    </div>
-                  </div>
+                  <input type="text" class="inline-search-input mi-input" placeholder="Cerca su Tustena…" value="${q}" />
+                  <button type="button" class="btn-inline-search mi-btn">Cerca</button>
+                  <ul class="inline-search-results mi-results" style="display:none"></ul>
+                  <button type="button" class="btn-mappa-confirm mi-mappa-btn" style="display:none" disabled>Mappa</button>
                 </div>
               </div>
             </div>`;
@@ -332,16 +326,10 @@ function renderPreview(allocations) {
               <div class="mi-row">
                 <span class="mi-name" title="${q}">${q}</span>
                 <span class="mi-arrow">→</span>
-                <div class="mi-search-wrap">
-                  <div class="mi-input-row">
-                    <button type="button" class="btn-inline-search mi-btn">Carica servizi</button>
-                  </div>
-                  <div class="mi-results-container" style="display:none">
-                    <ul class="inline-search-results mi-results"></ul>
-                    <div class="mi-mappa-row">
-                      <button type="button" class="btn-mappa-confirm mi-mappa-btn" disabled>Mappa</button>
-                    </div>
-                  </div>
+                <div class="mi-search-wrap mi-search-wrap--load">
+                  <button type="button" class="btn-inline-search mi-btn">Carica servizi</button>
+                  <ul class="inline-search-results mi-results" style="display:none"></ul>
+                  <button type="button" class="btn-mappa-confirm mi-mappa-btn" style="display:none" disabled>Mappa</button>
                 </div>
               </div>
             </div>`;
@@ -550,7 +538,6 @@ document.getElementById('voucher-list').addEventListener('click', async e => {
     const actionEl   = btn.closest('.voucher-error-action');
     const inputEl    = actionEl.querySelector('.inline-search-input');
     const results    = actionEl.querySelector('.inline-search-results');
-    const container  = actionEl.querySelector('.mi-results-container');
     const mappaBtn   = actionEl.querySelector('.btn-mappa-confirm');
     const type       = actionEl.dataset.type;
     const query      = inputEl ? inputEl.value.trim() : '';
@@ -559,8 +546,8 @@ document.getElementById('voucher-list').addEventListener('click', async e => {
     if (type === 'company' && !query) return;
 
     results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Ricerca in corso…</li>';
-    container.style.display = '';
-    if (mappaBtn) mappaBtn.disabled = true;
+    results.style.display = '';
+    if (mappaBtn) { mappaBtn.disabled = true; mappaBtn.style.display = ''; }
 
     try {
       let resp;
@@ -585,7 +572,7 @@ document.getElementById('voucher-list').addEventListener('click', async e => {
         json.companies.forEach(c => { nameCounts[c.name] = (nameCounts[c.name] || 0) + 1; });
         results.innerHTML = json.companies.map(c => {
           const isDup = nameCounts[c.name] > 1;
-          const label = isDup ? `${c.name} <span style="opacity:0.6;font-size:0.8em">#${c.id}</span>` : c.name;
+          const label = isDup ? `${c.name} <span style="opacity:0.6">#${c.id}</span>` : c.name;
           return `<li class="inline-result-item" data-id="${c.id}" data-name="${c.name.replace(/"/g,'&quot;')}" data-dup="${isDup}">${label}</li>`;
         }).join('');
       } else {
