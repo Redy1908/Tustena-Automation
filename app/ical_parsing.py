@@ -40,10 +40,28 @@ def parse_ical_feed(ical_text: str, skip_holidays: bool = True) -> list[dict]:
     for component in cal.walk('VEVENT'):
         summary = str(component.get('SUMMARY', ''))
         parts = [p.strip() for p in summary.split(' / ')]
+
+        def _get_date_str() -> str:
+            dtstart = component.get('DTSTART')
+            raw_dt = dtstart.dt if dtstart else None
+            if not raw_dt:
+                return '?'
+            return (raw_dt.date() if isinstance(raw_dt, datetime) else raw_dt).strftime('%Y-%m-%d')
+
         if len(parts) < 4:
+            tasks.append({
+                'client_name':  '',
+                'raw_summary':  summary,
+                'notes':        '',
+                'start_date':   _get_date_str(),
+                'start_time':   '09:00',
+                'end_time':     '09:00',
+                'hours':        0,
+                'error':        'Formato allocazione non riconosciuto.',
+                'error_type':   'format',
+            })
             continue
 
-        task_info = parts[0]
         contract_code = parts[1]
         client_name = parts[-1]
         service_description = ' / '.join(parts[2:-1])
@@ -51,9 +69,22 @@ def parse_ical_feed(ical_text: str, skip_holidays: bool = True) -> list[dict]:
         if contract_code.startswith('INT'):
             continue
 
-        hours_match = _HOURS_RE.search(task_info)
+        hours_match = _HOURS_RE.search(parts[0])
         if not hours_match:
+            tasks.append({
+                'client_name':        client_name,
+                'contract_code':      contract_code,
+                'service_description': service_description,
+                'notes':              '',
+                'start_date':         _get_date_str(),
+                'start_time':         '09:00',
+                'end_time':           '09:00',
+                'hours':              0,
+                'error':              f'Ore non trovate nel summary: "{summary}"',
+                'error_type':         'format',
+            })
             continue
+
         hours = round(float(hours_match.group(1)), 2)
 
         notes = str(component.get('DESCRIPTION', '') or '').strip()
@@ -76,13 +107,14 @@ def parse_ical_feed(ical_text: str, skip_holidays: bool = True) -> list[dict]:
             day_cursor[date_str] = t_end
 
             tasks.append({
-                'client_name':  client_name,
-                'project_name': f'{contract_code} / {service_description}',
-                'notes':        notes,
-                'start_date':   date_str,
-                'start_time':   t_start.strftime('%H:%M'),
-                'end_time':     t_end.strftime('%H:%M'),
-                'hours':        hours,
+                'client_name':         client_name,
+                'contract_code':       contract_code,
+                'service_description': service_description,
+                'notes':               notes,
+                'start_date':          date_str,
+                'start_time':          t_start.strftime('%H:%M'),
+                'end_time':            t_end.strftime('%H:%M'),
+                'hours':               hours,
             })
             current += timedelta(days=1)
 

@@ -14,7 +14,8 @@ def test_parse_basic_event():
     tasks = parse_ical_feed(SAMPLE_ICAL, skip_holidays=False)
     acme = [t for t in tasks if t["client_name"] == "ACME S.P.A."]
     assert len(acme) == 1
-    assert acme[0]["project_name"] == "PS-043-26 / Platform Support"
+    assert acme[0]["contract_code"] == "PS-043-26"
+    assert acme[0]["service_description"] == "Platform Support"
     assert acme[0]["hours"] == 2.0
     assert acme[0]["start_date"] == "2025-01-06"
     assert acme[0]["notes"] == "Attività di supporto"
@@ -30,7 +31,7 @@ def test_multi_day_event_expands():
 
 def test_internal_projects_filtered():
     tasks = parse_ical_feed(SAMPLE_ICAL, skip_holidays=False)
-    assert all(not t["project_name"].startswith("INT") for t in tasks)
+    assert all(not t.get("contract_code", "").startswith("INT") for t in tasks)
 
 
 def test_tasks_sorted_by_date():
@@ -110,11 +111,11 @@ END:VCALENDAR
 """
     tasks = parse_ical_feed(ical, skip_holidays=False)
     assert len(tasks) == 2
-    tasks_by_project = {t["project_name"]: t for t in tasks}
-    assert tasks_by_project["PS-001 / Service A"]["start_time"] == "09:00"
-    assert tasks_by_project["PS-001 / Service A"]["end_time"] == "11:00"
-    assert tasks_by_project["PS-002 / Service B"]["start_time"] == "11:00"
-    assert tasks_by_project["PS-002 / Service B"]["end_time"] == "14:00"
+    tasks_by_contract = {t["contract_code"]: t for t in tasks}
+    assert tasks_by_contract["PS-001"]["start_time"] == "09:00"
+    assert tasks_by_contract["PS-001"]["end_time"] == "11:00"
+    assert tasks_by_contract["PS-002"]["start_time"] == "11:00"
+    assert tasks_by_contract["PS-002"]["end_time"] == "14:00"
 
 
 def test_event_without_hours_skipped():

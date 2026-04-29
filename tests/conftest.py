@@ -27,13 +27,14 @@ END:VCALENDAR
 """
 
 SAMPLE_TASK = {
-    "client_name":  "ACME S.P.A.",
-    "project_name": "PS-043-26 / Platform Support",
-    "notes":        "Attività di supporto",
-    "start_date":   "2025-01-06",
-    "start_time":   "09:00",
-    "end_time":     "11:00",
-    "hours":        2.0,
+    "client_name":         "ACME S.P.A.",
+    "contract_code":       "PS-043-26",
+    "service_description": "Platform Support",
+    "notes":               "Attività di supporto",
+    "start_date":          "2025-01-06",
+    "start_time":          "09:00",
+    "end_time":            "11:00",
+    "hours":               2.0,
 }
 
 ENRICHED_TASK = {

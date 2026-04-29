@@ -100,15 +100,16 @@ def test_create_voucher_payload(mock_session):
     mock_session.post.return_value = make_mock_response({"id": 999})
     from tustena_api import tustena_create_voucher
     task = {
-        "client_name":  "ACME S.P.A.",
-        "project_name": "PS-043-26 / Platform Support",
-        "company_id":   1,
-        "contract_id":  10,
-        "service_id":   100,
-        "start_date":   "2025-01-06",
-        "start_time":   "09:00",
-        "end_time":     "11:00",
-        "description":  "Test note",
+        "client_name":         "ACME S.P.A.",
+        "contract_code":       "PS-043-26",
+        "service_description": "Platform Support",
+        "company_id":          1,
+        "contract_id":         10,
+        "service_id":          100,
+        "start_date":          "2025-01-06",
+        "start_time":          "09:00",
+        "end_time":            "11:00",
+        "description":         "Test note",
     }
     tustena_create_voucher(task, "key", {})
     payload = mock_session.post.call_args[1]["json"]

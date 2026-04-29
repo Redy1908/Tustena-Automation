@@ -127,7 +127,7 @@ def tustena_create_voucher(task: dict, api_key: str, template: dict) -> int:
     sh, sm   = map(int, start.split(":"))
     eh, em   = map(int, end.split(":"))
     duration = (eh * 60 + em) - (sh * 60 + sm)
-    subject  = f"{task['client_name']} / {task['project_name']}"
+    subject  = f"{task['client_name']} / {task['contract_code']} / {task['service_description']}"
 
     payload = {
         **_VOUCHER_DEFAULTS,

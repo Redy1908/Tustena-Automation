@@ -460,13 +460,10 @@ textarea.input-error {
   min-width: 0;
 }
 
-.mi-search-wrap--load .btn-inline-search {
-  grid-column: 1 / -1;
-  width: auto;
-}
 
 .mi-results {
   max-height: 10rem;
+  min-width: 0;
   overflow-y: auto;
   border: 1px solid var(--input-border);
   border-radius: 8px;
@@ -567,6 +564,26 @@ textarea.input-error {
 
 .voucher-date-sep:first-child { margin-top: 0; }
 
+.day-overtime-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  margin-bottom: 0.4rem;
+  background: #FEF9C3;
+  border: 1px solid #FDE047;
+  border-radius: 6px;
+  color: #713F12;
+  font-size: 0.78rem;
+}
+
+.day-overtime-warning svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  color: #CA8A04;
+}
+
 .voucher-row {
   display: flex;
   flex-direction: column;
@@ -620,6 +637,15 @@ textarea.input-error {
   text-overflow: ellipsis;
 }
 
+.vm-tertiary {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.75;
+}
+
 
 .voucher-main {
   display: flex;
@@ -639,7 +665,7 @@ textarea.input-error {
   outline: none;
   resize: vertical;
   font-family: inherit;
-  line-height: 1.5;
+  line-height: 1.5rem;
   min-height: 2.2rem;
   transition: border-color 0.15s, box-shadow 0.15s;
 }

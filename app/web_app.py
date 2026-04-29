@@ -40,9 +40,10 @@ def _get_tustena_context(api_key: str) -> tuple[str, str]:
 
 
 def _resolve_tustena_ids(task: dict, api_key: str, cache: dict, company_mapping: dict = None, service_mapping: dict = None) -> dict:
-    parts = task.get("project_name", "").split(" / ", 1)
-    contract_code       = parts[0].strip() if parts else ""
-    service_description = parts[1].strip() if len(parts) > 1 else ""
+    if "error" in task:
+        return task
+    contract_code       = task.get("contract_code", "")
+    service_description = task.get("service_description", "")
     name = task.get("client_name", "")
 
     try:
@@ -93,7 +94,7 @@ def _enrich_and_check(tasks: list, api_key: str, tustena_user_id: str, company_m
             logger.error("Failed to fetch existing subjects for company %s: %s", company_id, e)
 
     for task in ok_tasks:
-        task["exists"] = f"{task['client_name']} / {task['project_name']}" in subjects.get((task["company_id"], task["start_date"]), set())
+        task["exists"] = f"{task['client_name']} / {task['contract_code']} / {task['service_description']}" in subjects.get((task["company_id"], task["start_date"]), set())
 
     return sorted(resolved, key=lambda t: t["start_date"])
 
@@ -162,6 +163,7 @@ def preview_ical():
 
         resp = requests.get(ical_url, timeout=30)
         resp.raise_for_status()
+        resp.encoding = 'utf-8'
 
         skip_holidays = data.get("skip_holidays", True)
         date_from     = data.get("date_from", "").strip()

@@ -291,6 +291,14 @@ function renderPreview(allocations) {
     sep.textContent = formatDate(date);
     list.appendChild(sep);
 
+    const totalHours = byDate[date].reduce((sum, { t }) => sum + (!t.exists ? (t.hours || 0) : 0), 0);
+    if (totalHours > 8) {
+      const warn = document.createElement('div');
+      warn.className = 'day-overtime-warning';
+      warn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>${totalHours}h allocate in questo giorno`;
+      list.appendChild(warn);
+    }
+
     byDate[date].forEach(({ t, i }) => {
       const { start, end } = timeMap[i];
       const row = document.createElement('div');
@@ -326,19 +334,20 @@ function renderPreview(allocations) {
               <div class="mi-row">
                 <span class="mi-name" title="${q}">${q}</span>
                 <span class="mi-arrow">→</span>
-                <div class="mi-search-wrap mi-search-wrap--load">
-                  <button type="button" class="btn-inline-search mi-btn">Carica servizi</button>
-                  <ul class="inline-search-results mi-results" style="display:none"></ul>
-                  <button type="button" class="btn-mappa-confirm mi-mappa-btn" style="display:none" disabled>Mappa</button>
+                <div class="mi-search-wrap">
+                  <ul class="inline-search-results mi-results"><li style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Ricerca in corso…</li></ul>
+                  <button type="button" class="btn-mappa-confirm mi-mappa-btn" disabled>Mappa</button>
                 </div>
               </div>
             </div>`;
         }
 
+        const esc = s => (s || '').replace(/"/g, '&quot;');
         row.innerHTML = `
           <div class="voucher-meta" style="flex:unset; width:100%; margin-bottom:0.5rem">
-            <div class="vm-primary" title="${t.project_name}">${t.project_name}</div>
-            <div class="vm-secondary" title="${t.client_name}">${t.client_name}</div>
+            <div class="vm-primary" title="${esc(t.raw_summary || t.contract_code)}">${t.raw_summary || t.contract_code || ''}</div>
+            <div class="vm-secondary" title="${esc(t.service_description)}">${t.service_description || ''}</div>
+            <div class="vm-tertiary" title="${esc(t.client_name)}">${t.client_name || ''}</div>
           </div>
           ${errorAction}`;
 
@@ -346,8 +355,9 @@ function renderPreview(allocations) {
         row.className = 'voucher-row voucher-exists';
         row.innerHTML = `
           <div class="voucher-meta">
-            <div class="vm-primary" title="${t.project_name}">${t.project_name}</div>
-            <div class="vm-secondary" title="${t.client_name}">${t.client_name}</div>
+            <div class="vm-primary" title="${t.contract_code}">${t.contract_code}</div>
+            <div class="vm-secondary" title="${t.service_description}">${t.service_description}</div>
+            <div class="vm-tertiary" title="${t.client_name}">${t.client_name}</div>
           </div>
           <span class="voucher-badge-exists">Già presente</span>`;
 
@@ -356,8 +366,9 @@ function renderPreview(allocations) {
         row.innerHTML = `
           <div class="voucher-main">
             <div class="voucher-meta">
-              <div class="vm-primary" title="${t.project_name}">${t.project_name}</div>
-              <div class="vm-secondary" title="${t.client_name}">${t.client_name}</div>
+              <div class="vm-primary" title="${t.contract_code}">${t.contract_code}</div>
+              <div class="vm-secondary" title="${t.service_description}">${t.service_description}</div>
+              <div class="vm-tertiary" title="${t.client_name}">${t.client_name}</div>
             </div>
             <div class="voucher-right">
               <div class="vf">
@@ -386,6 +397,10 @@ function renderPreview(allocations) {
         updateDuration(row, t.hours);
       }
       list.appendChild(row);
+
+      if (t.error_type === 'service') {
+        _fetchServiceResults(row.querySelector('.voucher-error-action'));
+      }
     });
   });
 
@@ -532,6 +547,31 @@ document.getElementById('voucher-list').addEventListener('click', async e => {
 
 /* ── Inline Mapping Resolution ────────────────────────────────────────────── */
 
+async function _fetchServiceResults(actionEl) {
+  const results    = actionEl.querySelector('.inline-search-results');
+  const mappaBtn   = actionEl.querySelector('.btn-mappa-confirm');
+  const company    = actionEl.dataset.company;
+  const contract   = actionEl.dataset.contract;
+  const tustenaKey = document.getElementById('tustena_api_key').value.trim();
+  const companyMapping = localStorage.getItem('company_mapping') || '';
+
+  if (mappaBtn) mappaBtn.disabled = true;
+
+  try {
+    const resp = await fetch(`/search_services?tustena_api_key=${encodeURIComponent(tustenaKey)}&company=${encodeURIComponent(company)}&contract=${encodeURIComponent(contract)}&company_mapping=${encodeURIComponent(companyMapping)}`);
+    const json = await resp.json();
+    if (json.error) {
+      results.innerHTML = `<li style="padding:0.35rem 0.6rem;color:var(--error);list-style:none;font-size:0.84rem">${json.error}</li>`;
+    } else if (!json.services.length) {
+      results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Nessun risultato.</li>';
+    } else {
+      results.innerHTML = json.services.map(name => `<li class="inline-result-item" data-name="${name.replace(/"/g,'&quot;')}">${name}</li>`).join('');
+    }
+  } catch {
+    results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--error);list-style:none;font-size:0.84rem">Errore di rete.</li>';
+  }
+}
+
 document.getElementById('voucher-list').addEventListener('click', async e => {
   const btn = e.target.closest('.btn-inline-search');
   if (btn) {
@@ -539,35 +579,23 @@ document.getElementById('voucher-list').addEventListener('click', async e => {
     const inputEl    = actionEl.querySelector('.inline-search-input');
     const results    = actionEl.querySelector('.inline-search-results');
     const mappaBtn   = actionEl.querySelector('.btn-mappa-confirm');
-    const type       = actionEl.dataset.type;
     const query      = inputEl ? inputEl.value.trim() : '';
     const tustenaKey = document.getElementById('tustena_api_key').value.trim();
 
-    if (type === 'company' && !query) return;
+    if (!query) return;
 
     results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Ricerca in corso…</li>';
     results.style.display = '';
     if (mappaBtn) { mappaBtn.disabled = true; mappaBtn.style.display = ''; }
 
     try {
-      let resp;
-      if (type === 'company') {
-        resp = await fetch(`/search_company?tustena_api_key=${encodeURIComponent(tustenaKey)}&q=${encodeURIComponent(query)}`);
-      } else {
-        const company        = actionEl.dataset.company;
-        const contract       = actionEl.dataset.contract;
-        const companyMapping = localStorage.getItem('company_mapping') || '';
-        resp = await fetch(`/search_services?tustena_api_key=${encodeURIComponent(tustenaKey)}&company=${encodeURIComponent(company)}&contract=${encodeURIComponent(contract)}&company_mapping=${encodeURIComponent(companyMapping)}`);
-      }
+      const resp = await fetch(`/search_company?tustena_api_key=${encodeURIComponent(tustenaKey)}&q=${encodeURIComponent(query)}`);
       const json = await resp.json();
-
       if (json.error) {
         results.innerHTML = `<li style="padding:0.35rem 0.6rem;color:var(--error);list-style:none;font-size:0.84rem">${json.error}</li>`;
-      } else if (type === 'company' && !json.companies.length) {
+      } else if (!json.companies.length) {
         results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Nessun risultato.</li>';
-      } else if (type === 'service' && !json.services.length) {
-        results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--text-muted);list-style:none;font-size:0.84rem">Nessun risultato.</li>';
-      } else if (type === 'company') {
+      } else {
         const nameCounts = {};
         json.companies.forEach(c => { nameCounts[c.name] = (nameCounts[c.name] || 0) + 1; });
         results.innerHTML = json.companies.map(c => {
@@ -575,8 +603,6 @@ document.getElementById('voucher-list').addEventListener('click', async e => {
           const label = isDup ? `${c.name} <span style="opacity:0.6">#${c.id}</span>` : c.name;
           return `<li class="inline-result-item" data-id="${c.id}" data-name="${c.name.replace(/"/g,'&quot;')}" data-dup="${isDup}">${label}</li>`;
         }).join('');
-      } else {
-        results.innerHTML = json.services.map(name => `<li class="inline-result-item" data-name="${name.replace(/"/g,'&quot;')}">${name}</li>`).join('');
       }
     } catch {
       results.innerHTML = '<li style="padding:0.35rem 0.6rem;color:var(--error);list-style:none;font-size:0.84rem">Errore di rete.</li>';
