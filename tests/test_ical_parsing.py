@@ -118,7 +118,7 @@ END:VCALENDAR
     assert tasks_by_contract["PS-002"]["end_time"] == "14:00"
 
 
-def test_event_without_hours_skipped():
+def test_event_without_hours_returns_format_error():
     ical = """\
 BEGIN:VCALENDAR
 BEGIN:VEVENT
@@ -129,10 +129,12 @@ END:VEVENT
 END:VCALENDAR
 """
     tasks = parse_ical_feed(ical, skip_holidays=False)
-    assert tasks == []
+    assert len(tasks) == 1
+    assert tasks[0]["error_type"] == "format"
+    assert tasks[0]["contract_code"] == "PS-001"
 
 
-def test_event_with_too_few_parts_skipped():
+def test_event_with_too_few_parts_returns_format_error():
     ical = """\
 BEGIN:VCALENDAR
 BEGIN:VEVENT
@@ -143,7 +145,9 @@ END:VEVENT
 END:VCALENDAR
 """
     tasks = parse_ical_feed(ical, skip_holidays=False)
-    assert tasks == []
+    assert len(tasks) == 1
+    assert tasks[0]["error_type"] == "format"
+    assert tasks[0]["raw_summary"] == "Only one part"
 
 
 def test_datetime_dtstart_and_dtend_coerced_to_date():
