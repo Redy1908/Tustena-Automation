@@ -3,52 +3,54 @@
 [![Tests](https://github.com/Redy1908/Tustena-Automation/actions/workflows/test.yml/badge.svg)](https://github.com/Redy1908/Tustena-Automation/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/Redy1908/Tustena-Automation/graph/badge.svg)](https://codecov.io/gh/Redy1908/Tustena-Automation)
 
-Strumento per creare automaticamente i **Voucher Intervento** su **Tustena CRM** a partire dalle allocazioni **Float**. Elimina la compilazione manuale dei rapportini: importa le allocazioni, rivedi i voucher e confermali in un click.
+A tool for automatically creating **Voucher Intervento** entries in **Tustena CRM** from **Float** allocations. Eliminates manual entry: import your allocations, review the vouchers, and confirm them in one click.
 
-## Avvio rapido
+## Quick start
 
 ```bash
 docker compose up --build -d
 ```
 
-L'app sarà disponibile su `http://localhost:5001`.
+The app will be available at `http://localhost:5001`.
 
-### Variabili d'ambiente (opzionali)
+### Environment variables (optional)
 
-Permettono di pre-compilare i campi nell'UI al primo avvio:
+These pre-fill the UI fields on first launch:
 
-| Variabile         | Descrizione                  | Dove si trova                                                 |
-| ----------------- | ---------------------------- | ------------------------------------------------------------- |
-| `TUSTENA_API_KEY` | API Key del CRM Tustena      | Tustena CRM → Setup → Gestione Account → Web API Keys → Nuova |
-| `FLOAT_ICAL_URL`  | URL del feed iCal di Float   | Personal → Calendar Integrations → Copy the link              |
+| Variable          | Description                  | Where to find it                                                      |
+| ----------------- | ---------------------------- | --------------------------------------------------------------------- |
+| `TUSTENA_API_KEY` | Tustena CRM API Key          | Tustena CRM → Setup → Gestione Account → Web API Keys → Nuova         |
+| `FLOAT_ICAL_URL`  | Float iCal feed URL          | Float → Personal → Calendar Integrations → Copy the link              |
 
 ```bash
-export TUSTENA_API_KEY=la-tua-key
+export TUSTENA_API_KEY=your-key
 export FLOAT_ICAL_URL=https://ical.float.com/...
 docker compose up --build -d
 ```
 
-## Come si usa
+## How to use
 
-1. Inserisci la tua **API Key Tustena** e l'**URL del feed iCal** di Float nelle Impostazioni e salva. La configurazione viene memorizzata nel browser e non è necessario reinserirla.
-2. La dashboard mostra le allocazioni della settimana corrente, raggruppate per giorno. Usa le frecce per navigare tra le settimane.
-3. Clicca **Crea** sul singolo voucher per inviarlo a Tustena.
+1. Enter your **Tustena API Key** and **Float iCal URL** in Settings and save. The configuration is stored in the browser and does not need to be re-entered.
+2. The dashboard shows the current week's allocations grouped by day. Use the arrows to navigate between weeks.
+3. Click **Crea** on a voucher to submit it to Tustena.
 
-> Dopo la creazione, invia manualmente la mail di rapportino da Tustena CRM.
+> After creation, remember to send the timesheet email manually from Tustena CRM.
 
-## Risoluzione mismatch nomi
+## Name mismatch resolution
 
-Alcuni voucher potrebbero andare in errore perché il nome azienda o servizio su Float non corrisponde a quello su Tustena. Usa la ricerca inline direttamente sul voucher per trovare il nome corretto e mapparlo: il mapping viene salvato automaticamente nelle Impostazioni e riapplicato alle sessioni successive.
+Some vouchers may fail because a company or service name in Float does not match the one in Tustena. Use the inline search directly on the voucher to find the correct name and map it — the mapping is saved automatically in Settings and reapplied in future sessions.
 
-## Note tecniche
+If two Tustena companies share the same name but have different IDs, the inline search will display each entry with its `#ID` so you can pick the correct one. The mapping will store the numeric ID to bypass any ambiguity.
 
-### Orari voucher
+## Technical notes
 
-Il primo voucher del giorno parte alle `09:00`, i successivi vengono incatenati:
+### Voucher times
+
+The first voucher of the day starts at `09:00`; subsequent ones are chained:
 
 ```
 Voucher A: 09:00 → 13:00
 Voucher B: 13:00 → 17:00
 ```
 
-Gli orari sono modificabili nell'anteprima prima della creazione se necessario.
+Times can be adjusted in the preview before creation.
