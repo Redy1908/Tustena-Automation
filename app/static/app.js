@@ -98,7 +98,7 @@ document.getElementById('mapping-toggle').addEventListener('click', function() {
   const expanded = this.getAttribute('aria-expanded') === 'true';
   this.setAttribute('aria-expanded', String(!expanded));
   document.getElementById('mapping-fields').style.display = expanded ? 'none' : 'block';
-  document.getElementById('mapping-toggle-label').textContent = expanded ? 'Mostra Mapping Nomi' : 'Nascondi Mapping Nomi';
+  document.getElementById('mapping-toggle-label').textContent = expanded ? 'Mapping Nomi (opzionale)' : 'Nascondi Mapping Nomi';
 });
 
 document.getElementById('week-prev-btn').addEventListener('click', () => { currentWeekOffset--; scheduleLoadWeek(); });
