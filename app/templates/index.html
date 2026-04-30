@@ -98,6 +98,7 @@
     <span>Problemi o suggerimenti?</span>
     <a href="https://github.com/Redy1908/Tustena-Automation" target="_blank" rel="noopener">GitHub</a>
   </div>
+  <div style="text-align:center; margin-top: 1rem; font-size: 0.75rem; opacity: 0.45;">v1.0</div>
 </div>
 
 <!-- MAIN VIEW (Voucher Dashboard) -->
@@ -163,16 +164,12 @@
       <p>Configura la <strong>API key Tustena</strong> e l'<strong>URL del feed iCal</strong> (Float) prima di utilizzare l'app. I mapping nomi permettono di correggere automaticamente le discrepanze tra i nomi presenti nel calendario e quelli in Tustena. La configurazione viene salvata nel browser e non è necessario reinserirla ad ogni accesso.</p>
     </div>
     <div class="help-section">
-      <h3>Dashboard settimanale</h3>
-      <p>Le allocazioni del feed iCal vengono mostrate settimana per settimana, raggruppate per giorno. Usa le frecce per navigare tra le settimane.</p>
-    </div>
-    <div class="help-section">
       <h3>Creazione voucher</h3>
       <p>Clicca <strong>Crea</strong> sul singolo voucher per inviarlo a Tustena. L'operazione non può essere annullata: eventuali correzioni vanno effettuate direttamente su Tustena. Dopo la creazione ricordati di inviare il rapportino via mail da Tustena.</p>
     </div>
     <div class="help-section">
       <h3>Aziende duplicate</h3>
-      <p>Se su Tustena esistono due aziende con lo stesso nome ma ID diversi, la ricerca per nome è ambigua e genera un errore. In questo caso, usa la ricerca inline: i risultati duplicati vengono mostrati con il loro <strong>#ID</strong> per poterli distinguere. Selezionando quello corretto, il mapping salva automaticamente l'ID numerico invece del nome. Puoi anche inserirlo manualmente nel <em>Company Mapping</em>: <code>{"Nome Float": 3672}</code>.</p>
+      <p>Se due aziende in Tustena hanno lo stesso nome, seleziona quella corretta dalla ricerca inline (mostrata con <strong>#ID</strong>) oppure inserisci l'ID manualmente nel <em>Company Mapping</em>: <code>{"Nome Float": 3672}</code>.</p>
     </div>
     <div class="modal-actions">
       <button type="button" class="btn" id="help-ok-btn">OK</button>
