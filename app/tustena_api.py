@@ -1,6 +1,7 @@
 import requests
 
-_TUSTENA_BASE_URL = "https://kiratechapp.cloud.teamsystem.com:444/api/v1"
+_TUSTENA_BASE_URL   = "https://kiratechapp.cloud.teamsystem.com:444/api/v1"
+_TUSTENA_LATEST_URL = "https://kiratechapp.cloud.teamsystem.com:444/api/latest"
 _session = requests.Session()
 
 _VOUCHER_DEFAULTS = {
@@ -34,6 +35,17 @@ def _post(path: str, api_key: str, json: dict = None) -> dict | list:
     return resp.json()
 
 
+def _post_latest(path: str, api_key: str, json: dict = None) -> dict | list:
+    resp = _session.post(
+        f"{_TUSTENA_LATEST_URL}/{path}",
+        params={"apikey": api_key},
+        json=json,
+        timeout=20,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def tustena_get_current_user_fullname(api_key: str) -> str:
     users = _post("Account/Search", api_key, json={"select": "id,name,surname"})
     if not users:
@@ -45,8 +57,8 @@ def tustena_get_current_user_fullname(api_key: str) -> str:
 def tustena_search_services(company_name: str, contract_code: str, api_key: str, company_overrides: dict = None) -> list[str]:
     company_id  = tustena_get_company_id(company_name, api_key, overrides=company_overrides)
     contract_id = tustena_get_contract_id(company_id, contract_code, api_key)
-    services    = _get(f"Contract/{contract_id}/Services", api_key)
-    return [s["catalogDescription"] for s in (services or [])]
+    services    = _post_latest("Contract/GetContractServicesForCaller", api_key, json={"contractId": contract_id})
+    return [s["description"] for s in (services or [])]
 
 
 def tustena_search_companies(query: str, api_key: str) -> list[dict]:
@@ -71,11 +83,10 @@ def tustena_get_company_id(company_name: str, api_key: str, overrides: dict = No
     raise ValueError(f"Nessun match trovato per '{mapped}'")
 
 
-def tustena_get_contract_id(company_id: str, contract_code: str, api_key: str):
-    contracts = [c for c in _post("Contract/SearchByODataCriteria", api_key,
-                                   json={"filter": f"crossId eq {company_id} and customerCode eq '{contract_code}'",
-                                         "select": "id,customerCode"})
-                 if c["customerCode"] == contract_code]
+def tustena_get_contract_id(company_id: int, contract_code: str, api_key: str):
+    all_contracts = _post_latest("Contract/GetContractsForCaller", api_key, json={"companyId": company_id})
+    contracts = [c for c in (all_contracts or [])
+                 if c.get("description", "").startswith(f"{contract_code} - ")]
     if len(contracts) == 1:
         return contracts[0]["id"]
     elif len(contracts) > 1:
@@ -83,12 +94,12 @@ def tustena_get_contract_id(company_id: str, contract_code: str, api_key: str):
     raise ValueError(f"Nessun match trovato per '{contract_code}'")
 
 
-def tustena_get_service_id(contract_id: str, service_description: str, api_key: str, overrides: dict = None):
+def tustena_get_service_id(contract_id: int, service_description: str, api_key: str, overrides: dict = None):
     mapping = overrides or {}
     service_description = mapping.get(service_description, service_description)
-    all_services = _get(f"Contract/{contract_id}/Services", api_key)
-    services = [s for s in all_services
-                if s["catalogDescription"].lower() == service_description.lower()]
+    all_services = _post_latest("Contract/GetContractServicesForCaller", api_key, json={"contractId": contract_id})
+    services = [s for s in (all_services or [])
+                if s["description"].lower().endswith(service_description.lower())]
     if len(services) == 1:
         return services[0]["id"]
     elif len(services) > 1:

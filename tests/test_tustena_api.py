@@ -46,7 +46,7 @@ def test_get_company_id_applies_mapping(mock_session):
 # ── tustena_get_contract_id ───────────────────────────────────────────────────
 
 def test_get_contract_id_single_match(mock_session):
-    mock_session.post.return_value = make_mock_response([{"id": 10, "customerCode": "PS-043-26"}])
+    mock_session.post.return_value = make_mock_response([{"id": 10, "description": "PS-043-26 - Platform Support"}])
     from tustena_api import tustena_get_contract_id
     assert tustena_get_contract_id(42, "PS-043-26", "key") == 10
 
@@ -61,24 +61,32 @@ def test_get_contract_id_no_match_raises(mock_session):
 # ── tustena_get_service_id ────────────────────────────────────────────────────
 
 def test_get_service_id_single_match(mock_session):
-    mock_session.get.return_value = make_mock_response([
-        {"id": 100, "catalogDescription": "Platform Support"},
+    mock_session.post.return_value = make_mock_response([
+        {"id": 100, "description": "Platform Support"},
+    ])
+    from tustena_api import tustena_get_service_id
+    assert tustena_get_service_id(10, "Platform Support", "key") == 100
+
+
+def test_get_service_id_with_status_prefix(mock_session):
+    mock_session.post.return_value = make_mock_response([
+        {"id": 100, "description": "IN ATTESA ORDINE - Platform Support"},
     ])
     from tustena_api import tustena_get_service_id
     assert tustena_get_service_id(10, "Platform Support", "key") == 100
 
 
 def test_get_service_id_case_insensitive(mock_session):
-    mock_session.get.return_value = make_mock_response([
-        {"id": 100, "catalogDescription": "Platform Support"},
+    mock_session.post.return_value = make_mock_response([
+        {"id": 100, "description": "Platform Support"},
     ])
     from tustena_api import tustena_get_service_id
     assert tustena_get_service_id(10, "platform support", "key") == 100
 
 
 def test_get_service_id_applies_mapping(mock_session):
-    mock_session.get.return_value = make_mock_response([
-        {"id": 100, "catalogDescription": "Platform Support Mapped"},
+    mock_session.post.return_value = make_mock_response([
+        {"id": 100, "description": "Platform Support Mapped"},
     ])
     from tustena_api import tustena_get_service_id
     result = tustena_get_service_id(10, "Platform Support", "key", overrides={"Platform Support": "Platform Support Mapped"})
@@ -86,8 +94,8 @@ def test_get_service_id_applies_mapping(mock_session):
 
 
 def test_get_service_id_no_match_raises(mock_session):
-    mock_session.get.return_value = make_mock_response([
-        {"id": 100, "catalogDescription": "Other Service"},
+    mock_session.post.return_value = make_mock_response([
+        {"id": 100, "description": "Other Service"},
     ])
     from tustena_api import tustena_get_service_id
     with pytest.raises(ValueError, match="Nessun match trovato"):
@@ -152,10 +160,10 @@ def test_search_companies(mock_session):
 # ── tustena_search_services ───────────────────────────────────────────────────
 
 def test_search_services(mock_session):
-    mock_session.post.return_value = make_mock_response([{"id": 1, "companyName": "ACME S.P.A."}])
-    mock_session.get.return_value = make_mock_response([
-        {"id": 100, "catalogDescription": "Platform Support"},
-    ])
+    mock_session.post.side_effect = [
+        make_mock_response([{"id": 1, "companyName": "ACME S.P.A."}]),
+        make_mock_response([{"id": 100, "description": "Platform Support"}]),
+    ]
     from tustena_api import tustena_search_services
     with patch("tustena_api.tustena_get_contract_id", return_value=10):
         result = tustena_search_services("ACME S.P.A.", "PS-043-26", "key")
@@ -166,8 +174,8 @@ def test_search_services(mock_session):
 
 def test_get_contract_id_multiple_matches_raises(mock_session):
     mock_session.post.return_value = make_mock_response([
-        {"id": 10, "customerCode": "PS-043-26"},
-        {"id": 11, "customerCode": "PS-043-26"},
+        {"id": 10, "description": "PS-043-26 - Service A"},
+        {"id": 11, "description": "PS-043-26 - Service B"},
     ])
     from tustena_api import tustena_get_contract_id
     with pytest.raises(ValueError, match="più match"):
@@ -177,9 +185,9 @@ def test_get_contract_id_multiple_matches_raises(mock_session):
 # ── tustena_get_service_id multiple matches ───────────────────────────────────
 
 def test_get_service_id_multiple_matches_raises(mock_session):
-    mock_session.get.return_value = make_mock_response([
-        {"id": 100, "catalogDescription": "Platform Support"},
-        {"id": 101, "catalogDescription": "Platform Support"},
+    mock_session.post.return_value = make_mock_response([
+        {"id": 100, "description": "Platform Support"},
+        {"id": 101, "description": "Platform Support"},
     ])
     from tustena_api import tustena_get_service_id
     with pytest.raises(ValueError, match="più match"):
